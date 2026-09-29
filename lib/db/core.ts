@@ -1,0 +1,37 @@
+import { eq, sql } from "drizzle-orm";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import * as schema from "./schema";
+
+export type Db = PgDatabase<PgQueryResultHKT, typeof schema>;
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/**
+ * Runs `fn` in a transaction scoped to one user. Row-Level Security policies read
+ * `app.user_id`, so every query inside can only see or write that user's rows.
+ * `set_config(..., true)` is transaction-local, so the setting can't leak to other
+ * requests sharing the pooled connection.
+ */
+export async function runAsUser<T>(db: Db, userId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  if (!userId) throw new Error("runAsUser: userId is required");
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('app.user_id', ${userId}, true)`);
+    return fn(tx);
+  });
+}
+
+/**
+ * Resolves which user owns a Plaid Item. Only for verified Plaid webhooks, which
+ * arrive without a user session. The `plaid_items_webhook_lookup` policy exposes
+ * exactly the one row whose plaid_item_id matches.
+ */
+export async function findItemOwner(db: Db, plaidItemId: string): Promise<string | null> {
+  if (!plaidItemId) return null;
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('app.lookup_item_id', ${plaidItemId}, true)`);
+    const [row] = await tx
+      .select({ userId: schema.plaidItems.userId })
+      .from(schema.plaidItems)
+      .where(eq(schema.plaidItems.plaidItemId, plaidItemId));
+    return row?.userId ?? null;
+  });
+}
