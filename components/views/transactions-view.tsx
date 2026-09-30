@@ -6,6 +6,7 @@ import { CategoryCell } from "@/components/transactions/category-cell";
 import { CategorySheetTrigger } from "@/components/transactions/category-sheet";
 import { TransactionFiltersBar } from "@/components/transactions/filters";
 import { TxnList } from "@/components/transactions/txn-list";
+import { TxnMenu } from "@/components/transactions/txn-menu";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatCents } from "@/lib/money";
@@ -85,13 +86,16 @@ export function TransactionsView({ data, today }: { data: TransactionsData; toda
             rows={data.rows}
             today={today}
             trailing={(r) => (
-              <CategoryCell
-                transactionId={r.id}
-                categoryId={r.categoryId}
-                merchant={r.merchant}
-                needsReview={r.needsReview}
-                options={options}
-              />
+              <div className="flex items-center gap-1">
+                <CategoryCell
+                  transactionId={r.id}
+                  categoryId={r.categoryId}
+                  merchant={r.merchant}
+                  needsReview={r.needsReview}
+                  options={options}
+                />
+                <TxnMenu transactionId={r.id} merchant={r.merchant} />
+              </div>
             )}
             rowAction={(r) => (
               <CategorySheetTrigger

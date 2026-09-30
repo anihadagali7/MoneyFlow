@@ -1,0 +1,1 @@
+ALTER TABLE "recurring_streams" ADD COLUMN "user_added" boolean DEFAULT false NOT NULL;

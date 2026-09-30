@@ -38,7 +38,29 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     },
     trips: { href: "/trips", node: <TripsView data={f.trips} today="2026-09-20" /> },
     trip: { href: "/trips", node: <TripDetailView data={f.tripDetail} today="2026-09-20" /> },
-    subscriptions: { href: "/subscriptions", node: <SubscriptionsView data={f.subscriptions} today="2026-09-20" /> },
+    subscriptions: {
+      href: "/subscriptions",
+      node: (
+        <SubscriptionsView
+          data={f.subscriptions}
+          today="2026-09-20"
+          merchants={[
+            {
+              transactionId: "10000000-0000-4000-8000-000000000002",
+              name: "ClassPass",
+              lastDate: "2026-09-14",
+              amountCents: 49_00,
+            },
+            {
+              transactionId: "10000000-0000-4000-8000-000000000003",
+              name: "NYT Digital",
+              lastDate: "2026-09-02",
+              amountCents: 4_25,
+            },
+          ]}
+        />
+      ),
+    },
     budgets: { href: "/budgets", node: <BudgetsView data={f.budgets} options={budgetDialogOptions(f.budgets)} /> },
     "budgets-empty": {
       href: "/budgets",

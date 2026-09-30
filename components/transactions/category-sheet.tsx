@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckIcon, PlusIcon } from "lucide-react";
+import { CheckIcon, PlusIcon, RepeatIcon } from "lucide-react";
+import { MarkSubscriptionDialog } from "@/components/subscriptions/mark-dialog";
 import { CategoryDialog } from "@/components/categories/category-dialog";
 import { toast } from "sonner";
 import { setCategory } from "@/actions/transactions";
@@ -32,6 +33,7 @@ export function CategorySheetTrigger({
   const [current, setCurrent] = useState(categoryId);
   const [pending, startTransition] = useTransition();
   const [creating, setCreating] = useState(false);
+  const [marking, setMarking] = useState(false);
 
   function choose(id: string, knownName?: string) {
     const name = knownName ?? options.find((o) => o.id === id)?.name ?? "category";
@@ -77,6 +79,17 @@ export function CategorySheetTrigger({
             </span>
             <Switch checked={always} onCheckedChange={setAlways} />
           </label>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setMarking(true);
+            }}
+            className="mx-4 mb-2 flex items-center gap-2 rounded-xl border px-4 py-3 text-left text-sm active:bg-muted"
+          >
+            <RepeatIcon className="size-4 text-muted-foreground" />
+            Mark as subscription
+          </button>
           <ul
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3"
             role="listbox"
@@ -116,6 +129,14 @@ export function CategorySheetTrigger({
         </SheetContent>
       </Sheet>
       {creating && <CategoryDialog open={creating} onOpenChange={setCreating} onSaved={(c) => choose(c.id, c.name)} />}
+      {marking && (
+        <MarkSubscriptionDialog
+          transactionId={transactionId}
+          merchant={merchant}
+          open={marking}
+          onOpenChange={setMarking}
+        />
+      )}
     </>
   );
 }

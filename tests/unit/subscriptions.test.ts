@@ -3,7 +3,14 @@ import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { runAsUser, type Db } from "@/lib/db/core";
 import { recurringStreams } from "@/lib/db/schema";
 import { syncItem } from "@/lib/plaid/sync";
-import { acknowledgePriceIncrease, dismissSubscription, loadSubscriptions, refreshSubscriptions } from "@/lib/subscriptions";
+import {
+  acknowledgePriceIncrease,
+  dismissSubscription,
+  loadSubscriptions,
+  markAsSubscription,
+  recentMerchants,
+  refreshSubscriptions,
+} from "@/lib/subscriptions";
 import type { Today } from "@/lib/time";
 import { page, plaidTxn, provider, runner, seedUserWithItem } from "../helpers/fixtures";
 import { createTestDb } from "../helpers/testDb";
@@ -77,5 +84,44 @@ describe("subscriptions", () => {
       loadSubscriptions(tx, await loadUserCrypto(tx, provider, U), { iso: "2026-10-05", month: { year: 2026, month: 10 } }),
     );
     expect(soon.upcoming.map((s) => s.name)).toEqual(["Netflix"]);
+  });
+});
+
+describe("marking subscriptions by hand", () => {
+  const txnId = async (merchant: string) =>
+    runAsUser(db, U, async (tx) => {
+      const { transactions } = await import("@/lib/db/schema");
+      const { desc } = await import("drizzle-orm");
+      const rows = await tx.select().from(transactions).orderBy(desc(transactions.date));
+      const crypto = await loadUserCrypto(tx, provider, U);
+      return rows.find((r) => crypto.decryptOrNull("transactions", "merchant_name_ct", r.merchantNameCt) === merchant)!.id;
+    });
+
+  it("tracks a merchant detection missed, from a single charge, and keeps it through re-detection", async () => {
+    // Whole Foods varies too much to be detected; the user says it's a monthly subscription anyway.
+    const id = await txnId("Whole Foods");
+    await runAsUser(db, U, async (tx) => markAsSubscription(tx, await loadUserCrypto(tx, provider, U), id, "monthly", today));
+    await refresh();
+    const wf = (await load()).active.find((s) => s.name === "Whole Foods");
+    expect(wf).toMatchObject({ frequency: "monthly", amountCents: 95_00, lastDate: "2026-09-20", nextDate: "2026-10-20" });
+  });
+
+  it("brings back a hidden subscription and can change a detected one's schedule", async () => {
+    await refresh();
+    const [netflix] = (await load()).active;
+    await runAsUser(db, U, (tx) => dismissSubscription(tx, netflix.id));
+    const id = await txnId("Netflix");
+    await runAsUser(db, U, async (tx) => markAsSubscription(tx, await loadUserCrypto(tx, provider, U), id, "annually", today));
+    const back = (await load()).active.find((s) => s.name === "Netflix");
+    expect(back).toMatchObject({ frequency: "annually", monthlyCents: Math.round(17_99 / 12) });
+  });
+
+  it("offers recent merchants that aren't tracked yet", async () => {
+    await refresh();
+    const merchants = await runAsUser(db, U, async (tx) => recentMerchants(tx, await loadUserCrypto(tx, provider, U), today));
+    const names = merchants.map((m) => m.name);
+    expect(names).toContain("Whole Foods");
+    expect(names).not.toContain("Netflix"); // already a subscription
+    expect(names).not.toContain("AUTOPAY PAYMENT THANK YOU");
   });
 });

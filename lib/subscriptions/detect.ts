@@ -102,3 +102,29 @@ export function priceIncrease(p: Pick<Pattern, "lastAmountCents" | "prevAmountCe
   const diff = p.lastAmountCents - p.prevAmountCents;
   return diff >= 50 && diff >= p.prevAmountCents * 0.01 ? diff : null;
 }
+
+/**
+ * Builds a pattern for a merchant the user marked as a subscription, using the schedule
+ * they chose rather than detection. Works from a single charge.
+ */
+export function patternFromCharges(input: Charge[], frequency: Frequency): Pattern | null {
+  const byDay = new Map<string, number>();
+  for (const c of input) if (c.amountCents > 0) byDay.set(c.date, Math.max(byDay.get(c.date) ?? 0, c.amountCents));
+  const charges = [...byDay].map(([date, amountCents]) => ({ date, amountCents })).sort((a, b) => a.date.localeCompare(b.date));
+  if (charges.length === 0) return null;
+  const last = charges[charges.length - 1];
+  const prev = charges.length > 1 ? charges[charges.length - 2] : null;
+  const f = FREQUENCIES[frequency];
+  const months = frequency === "monthly" ? 1 : frequency === "quarterly" ? 3 : frequency === "annually" ? 12 : 0;
+  return {
+    frequency,
+    occurrences: charges.length,
+    firstDate: charges[0].date,
+    lastDate: last.date,
+    nextDate: months ? addMonths(last.date, months) : iso(utc(last.date) + f.days * DAY),
+    lastAmountCents: last.amountCents,
+    prevAmountCents: prev?.amountCents ?? null,
+    typicalAmountCents: median(charges.map((c) => c.amountCents)),
+    monthlyCents: Math.round(last.amountCents * f.perMonth),
+  };
+}

@@ -64,6 +64,13 @@
       "when": 1790780674847,
       "tag": "0008_income_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790786191892,
+      "tag": "0009_manual_subscriptions",
+      "breakpoints": true
     }
   ]
 }

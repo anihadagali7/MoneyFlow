@@ -137,6 +137,8 @@ export const recurringStreams = pgTable(
     monthlyCents: cents("monthly_cents"),
     /** The user said "not a subscription"; kept so detection doesn't bring it back. */
     dismissed: boolean("dismissed").notNull().default(false),
+    /** The user marked it as a subscription; kept even when detection doesn't see a pattern. */
+    userAdded: boolean("user_added").notNull().default(false),
     /** Price the user has already been told about, so a price-increase alert shows once. */
     priceAckCents: cents("price_ack_cents"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

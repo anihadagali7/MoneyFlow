@@ -2,6 +2,7 @@ import { RepeatIcon, TrendingUpIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { StatTile } from "@/components/stat-tile";
+import { AddSubscriptionButton } from "@/components/subscriptions/add-subscription";
 import { DismissPriceIncrease, SubscriptionMenu } from "@/components/subscriptions/controls";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCents } from "@/lib/money";
@@ -48,16 +49,27 @@ function Row({ s, today }: { s: SubscriptionView; today: string }) {
   );
 }
 
-export function SubscriptionsView({ data, today }: { data: SubscriptionsData; today: string }) {
+export type RecentMerchant = { transactionId: string; name: string; lastDate: string; amountCents: number };
+
+export function SubscriptionsView({
+  data,
+  today,
+  merchants = [],
+}: {
+  data: SubscriptionsData;
+  today: string;
+  merchants?: RecentMerchant[];
+}) {
+  const add = <AddSubscriptionButton merchants={merchants} />;
   if (data.active.length === 0 && data.stopped.length === 0) {
     return (
       <>
-        <PageHeader title="Subscriptions" description="Recurring charges found in your transactions" />
+        <PageHeader title="Subscriptions" description="Recurring charges found in your transactions" actions={add} />
         <Card>
           <EmptyState
             icon={RepeatIcon}
             title="No subscriptions found yet"
-            description="MoneyFlow looks for charges from the same merchant, at a regular interval, for a steady amount. It needs about 3 months of history to spot a monthly subscription."
+            description="MoneyFlow looks for charges from the same merchant, at a regular interval, for a steady amount. It needs about 3 months of history to spot a monthly one, so add any it hasn't found yet."
           />
         </Card>
       </>
@@ -66,7 +78,7 @@ export function SubscriptionsView({ data, today }: { data: SubscriptionsData; to
 
   return (
     <>
-      <PageHeader title="Subscriptions" description="Recurring charges found in your transactions" />
+      <PageHeader title="Subscriptions" description="Recurring charges found in your transactions" actions={add} />
 
       {data.priceIncreases.length > 0 && (
         <div className="mb-4 flex flex-col gap-2">

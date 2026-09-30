@@ -3,7 +3,7 @@ import type { UserCrypto } from "@/lib/crypto/userCrypto";
 import type { Tx } from "@/lib/db/core";
 import { categories, recurringStreams, transactions } from "@/lib/db/schema";
 import type { Today } from "@/lib/time";
-import { detectPattern, FREQUENCIES, isActive, priceIncrease, type Frequency } from "./detect";
+import { detectPattern, FREQUENCIES, isActive, patternFromCharges, priceIncrease, type Frequency } from "./detect";
 
 const LOOKBACK_DAYS = 400; // a little over a year, so yearly charges show up twice
 
@@ -43,9 +43,17 @@ export async function refreshSubscriptions(tx: Tx, crypto: UserCrypto, today: To
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
 
+  // Subscriptions the user marked keep their chosen schedule, pattern or not.
+  const marked = await tx
+    .select({ merchantHash: recurringStreams.merchantHash, frequency: recurringStreams.frequency })
+    .from(recurringStreams)
+    .where(and(eq(recurringStreams.userAdded, true), eq(recurringStreams.dismissed, false)));
+  const markedFrequency = new Map(marked.map((m) => [m.merchantHash!.toString("hex"), m.frequency as Frequency]));
+
   const detected: Buffer[] = [];
-  for (const charges of groups.values()) {
-    const pattern = detectPattern(charges);
+  for (const [key, charges] of groups) {
+    const chosen = markedFrequency.get(key);
+    const pattern = chosen ? patternFromCharges(charges, chosen) : detectPattern(charges);
     if (!pattern) continue;
     const latest = charges[0]; // newest first
     const name =
@@ -78,6 +86,7 @@ export async function refreshSubscriptions(tx: Tx, crypto: UserCrypto, today: To
     .where(
       and(
         eq(recurringStreams.dismissed, false),
+        eq(recurringStreams.userAdded, false),
         isNull(recurringStreams.plaidStreamId),
         detected.length ? notInArray(recurringStreams.merchantHash, detected) : undefined,
       ),
@@ -158,4 +167,76 @@ export async function dismissSubscription(tx: Tx, id: string) {
 export async function acknowledgePriceIncrease(tx: Tx, id: string) {
   const [s] = await tx.select({ last: recurringStreams.lastAmountCents }).from(recurringStreams).where(eq(recurringStreams.id, id));
   if (s) await tx.update(recurringStreams).set({ priceAckCents: s.last }).where(eq(recurringStreams.id, id));
+}
+
+export class SubscriptionError extends Error {}
+
+/**
+ * Marks the merchant of a transaction as a subscription on the chosen schedule, then
+ * refreshes so it shows up with its next expected charge. Re-marking a hidden one brings it back.
+ */
+export async function markAsSubscription(tx: Tx, crypto: UserCrypto, transactionId: string, frequency: Frequency, today: Today) {
+  const [txn] = await tx
+    .select({ merchantHash: transactions.merchantHash, categoryId: transactions.categoryId })
+    .from(transactions)
+    .where(eq(transactions.id, transactionId));
+  if (!txn) throw new SubscriptionError("Transaction not found.");
+  if (!txn.merchantHash) throw new SubscriptionError("This charge has no merchant to track.");
+  await tx
+    .insert(recurringStreams)
+    .values({ userId: crypto.userId, merchantHash: txn.merchantHash, frequency, userAdded: true, categoryId: txn.categoryId })
+    .onConflictDoUpdate({
+      target: [recurringStreams.userId, recurringStreams.merchantHash],
+      set: { frequency, userAdded: true, dismissed: false, updatedAt: new Date() },
+    });
+  await refreshSubscriptions(tx, crypto, today);
+}
+
+/** Recent merchants to pick from when adding a subscription by hand (one per merchant, newest first). */
+export async function recentMerchants(tx: Tx, crypto: UserCrypto, today: Today) {
+  const since = new Date(Date.parse(`${today.iso}T00:00:00Z`) - 120 * 86_400_000).toISOString().slice(0, 10);
+  const [rows, tracked] = await Promise.all([
+    tx
+      .select({
+        id: transactions.id,
+        merchantHash: transactions.merchantHash,
+        date: transactions.date,
+        amountCents: transactions.amountCents,
+        merchantNameCt: transactions.merchantNameCt,
+        descriptionCt: transactions.descriptionCt,
+      })
+      .from(transactions)
+      .leftJoin(categories, eq(categories.id, transactions.categoryId))
+      .where(
+        and(
+          gte(transactions.date, since),
+          gt(transactions.amountCents, 0),
+          isNotNull(transactions.merchantHash),
+          or(isNull(categories.countsAsSpend), eq(categories.countsAsSpend, true)),
+        ),
+      )
+      .orderBy(desc(transactions.date)),
+    tx
+      .select({ merchantHash: recurringStreams.merchantHash })
+      .from(recurringStreams)
+      .where(eq(recurringStreams.dismissed, false)),
+  ]);
+  const skip = new Set(tracked.map((t) => t.merchantHash?.toString("hex")));
+  const seen = new Set<string>();
+  const out: Array<{ transactionId: string; name: string; lastDate: string; amountCents: number }> = [];
+  for (const r of rows) {
+    const key = r.merchantHash!.toString("hex");
+    if (seen.has(key) || skip.has(key)) continue;
+    seen.add(key);
+    out.push({
+      transactionId: r.id,
+      name:
+        crypto.decryptOrNull("transactions", "merchant_name_ct", r.merchantNameCt) ??
+        crypto.decrypt("transactions", "description_ct", r.descriptionCt),
+      lastDate: r.date,
+      amountCents: r.amountCents,
+    });
+    if (out.length === 60) break;
+  }
+  return out;
 }
