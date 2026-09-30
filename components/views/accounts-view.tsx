@@ -2,6 +2,7 @@ import { AlertTriangleIcon, CheckCircle2Icon, CreditCardIcon, LockIcon } from "l
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { ConnectCardButton } from "@/components/plaid/connect-card-button";
+import { CardMenu, RestoreCardButton } from "@/components/settings/card-controls";
 import { DisconnectButton } from "@/components/settings/disconnect-button";
 import { SyncButton } from "@/components/sync-button";
 import { Card } from "@/components/ui/card";
@@ -34,7 +35,12 @@ export function AccountsView({ items, now }: { items: ItemSummary[]; now: number
 
       {items.length === 0 ? (
         <Card>
-          <EmptyState icon={CreditCardIcon} title="No cards connected" description="Connect a bank to import your credit card transactions." action={<ConnectCardButton />} />
+          <EmptyState
+            icon={CreditCardIcon}
+            title="No cards connected"
+            description="Connect a bank to import your credit card transactions."
+            action={<ConnectCardButton />}
+          />
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
@@ -54,19 +60,43 @@ export function AccountsView({ items, now }: { items: ItemSummary[]; now: number
                       </div>
                     </div>
                   </div>
-                  <span className={`inline-flex items-center gap-1 text-xs ${status.ok ? "text-positive" : "text-destructive"}`}>
+                  <span
+                    className={`inline-flex items-center gap-1 text-xs ${status.ok ? "text-positive" : "text-destructive"}`}
+                  >
                     {status.ok ? <CheckCircle2Icon className="size-3.5" /> : <AlertTriangleIcon className="size-3.5" />}
                     {status.label}
                   </span>
                 </div>
-                {item.cards.length > 0 && (
+                {item.cards.some((c) => !c.removed) && (
                   <ul className="flex flex-col gap-1.5 text-sm">
-                    {item.cards.map((c) => (
-                      <li key={c} className="flex items-center justify-between rounded-md bg-muted/60 px-3 py-2">
-                        <span className="truncate">{c}</span>
-                      </li>
-                    ))}
+                    {item.cards
+                      .filter((c) => !c.removed)
+                      .map((c) => (
+                        <li
+                          key={c.id}
+                          className="flex items-center justify-between gap-2 rounded-md bg-muted/60 py-1 pr-1 pl-3"
+                        >
+                          <span className="truncate">{c.label}</span>
+                          <CardMenu id={c.id} label={c.label} bank={item.institutionName} />
+                        </li>
+                      ))}
                   </ul>
+                )}
+                {item.cards.some((c) => c.removed) && (
+                  <div className="flex flex-col gap-1 text-sm">
+                    <div className="text-xs text-muted-foreground">Removed</div>
+                    {item.cards
+                      .filter((c) => c.removed)
+                      .map((c) => (
+                        <div
+                          key={c.id}
+                          className="flex items-center justify-between gap-2 py-0.5 pl-3 text-muted-foreground"
+                        >
+                          <span className="truncate line-through decoration-muted-foreground/50">{c.label}</span>
+                          <RestoreCardButton id={c.id} label={c.label} />
+                        </div>
+                      ))}
+                  </div>
                 )}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   {!status.ok && item.status !== "revoked" ? (

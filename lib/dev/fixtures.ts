@@ -82,14 +82,17 @@ const items: ItemSummary[] = [
     institutionName: "Capital One",
     status: "active",
     lastSyncedAt: "2026-09-30T07:40:00Z",
-    cards: ["Venture X ••4821", "Quicksilver ••1190"],
+    cards: [
+      { id: "card-1", label: "Venture X ••4821", removed: false },
+      { id: "card-2", label: "Quicksilver ••1190", removed: true },
+    ],
   },
   {
     id: "item-2",
     institutionName: "Chase",
     status: "login_required",
     lastSyncedAt: "2026-09-27T12:00:00Z",
-    cards: ["Sapphire Preferred ••7703"],
+    cards: [{ id: "card-3", label: "Sapphire Preferred ••7703", removed: false }],
   },
 ];
 

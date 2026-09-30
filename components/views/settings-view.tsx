@@ -14,6 +14,8 @@ export type SettingsData = {
 const ACTION_LABEL: Record<string, string> = {
   "item.link": "Connected a bank",
   "item.remove": "Disconnected a bank",
+  "card.remove": "Removed a card",
+  "card.restore": "Added a card back",
   "rule.create": "Created a category rule",
   export: "Downloaded your data",
   "account.delete": "Deleted account",

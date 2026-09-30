@@ -165,10 +165,11 @@ export async function applySyncUpdates(
       .onConflictDoUpdate({ target: accounts.plaidAccountId, set: values });
   }
   const accountRows = await tx
-    .select({ id: accounts.id, plaidAccountId: accounts.plaidAccountId, type: accounts.type })
+    .select({ id: accounts.id, plaidAccountId: accounts.plaidAccountId, type: accounts.type, isHidden: accounts.isHidden })
     .from(accounts)
     .where(eq(accounts.itemId, itemId));
-  const accountIdByPlaid = new Map(accountRows.map((a) => [a.plaidAccountId, a.id]));
+  // Cards the user removed are ignored: their transactions aren't stored.
+  const accountIdByPlaid = new Map(accountRows.filter((a) => !a.isHidden).map((a) => [a.plaidAccountId, a.id]));
   const accountTypeByPlaid = new Map(accountRows.map((a) => [a.plaidAccountId, a.type]));
 
   const categoryIds = await loadCategoryIds(tx);

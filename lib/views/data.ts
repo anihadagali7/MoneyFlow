@@ -21,7 +21,7 @@ export type ItemSummary = {
   institutionName: string;
   status: string;
   lastSyncedAt: string | null;
-  cards: string[];
+  cards: Array<{ id: string; label: string; removed: boolean }>;
 };
 export type TxnRow = {
   id: string;
@@ -39,11 +39,12 @@ export type TxnRow = {
 };
 export type CategoryRef = { id: string; slug: string; name: string };
 
-async function loadCards(tx: Tx, crypto: UserCrypto): Promise<Array<CardRef & { itemId: string }>> {
+async function loadCards(tx: Tx, crypto: UserCrypto): Promise<Array<CardRef & { itemId: string; removed: boolean }>> {
   const rows = await tx.select().from(accounts);
   return rows.map((a) => ({
     id: a.id,
     itemId: a.itemId,
+    removed: a.isHidden,
     label: `${crypto.decrypt("accounts", "name_ct", a.nameCt)}${a.maskCt ? ` ••${crypto.decrypt("accounts", "mask_ct", a.maskCt)}` : ""}`,
   }));
 }
@@ -55,7 +56,7 @@ export async function loadItems(tx: Tx, crypto: UserCrypto): Promise<ItemSummary
     institutionName: i.institutionName ?? "Card",
     status: i.status,
     lastSyncedAt: i.lastSyncedAt?.toISOString() ?? null,
-    cards: cards.filter((c) => c.itemId === i.id).map((c) => c.label),
+    cards: cards.filter((c) => c.itemId === i.id).map((c) => ({ id: c.id, label: c.label, removed: c.removed })),
   }));
 }
 
@@ -202,7 +203,7 @@ export async function loadTransactions(
     nextMonthKey: formatMonth(shiftMonth(month, 1)),
     filters,
     categories: categoryRows,
-    cards: cards.map(({ id, label }) => ({ id, label })),
+    cards: cards.filter((c) => !c.removed).map(({ id, label }) => ({ id, label })),
     rows: filtered,
     // Card payments are moving money, not spending or income, so they're left out.
     totals: {
