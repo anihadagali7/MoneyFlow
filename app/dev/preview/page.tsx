@@ -7,12 +7,13 @@ import { DashboardView } from "@/components/views/dashboard-view";
 import { IncomeView } from "@/components/views/income-view";
 import { ReportsView } from "@/components/views/reports-view";
 import { SettingsView } from "@/components/views/settings-view";
+import { SubscriptionsView } from "@/components/views/subscriptions-view";
 import { TransactionsView } from "@/components/views/transactions-view";
 import { fixtures } from "@/lib/dev/fixtures";
 
 /**
  * Development-only: renders each signed-in screen with sample data, for design review
- * without an account. 404s in production. /dev/preview?view=dashboard|transactions|budgets|reports|income|accounts|settings|empty
+ * without an account. 404s in production. /dev/preview?view=dashboard|transactions|budgets|subscriptions|reports|income|accounts|settings|empty
  */
 export default async function PreviewPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   if (process.env.NODE_ENV === "production") notFound();
@@ -22,8 +23,17 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
   const screens: Record<string, { href: string; node: React.ReactNode }> = {
     dashboard: {
       href: "/dashboard",
-      node: <DashboardView data={f.dashboard} today={f.today} budgets={f.budgets} alerts={f.alerts} />,
+      node: (
+        <DashboardView
+          data={f.dashboard}
+          today={f.today}
+          budgets={f.budgets}
+          alerts={f.alerts}
+          subscriptions={f.subscriptions}
+        />
+      ),
     },
+    subscriptions: { href: "/subscriptions", node: <SubscriptionsView data={f.subscriptions} today="2026-09-20" /> },
     budgets: { href: "/budgets", node: <BudgetsView data={f.budgets} options={budgetDialogOptions(f.budgets)} /> },
     "budgets-empty": {
       href: "/budgets",
@@ -38,7 +48,10 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     transactions: { href: "/transactions", node: <TransactionsView data={f.transactions} today={f.today} /> },
     reports: { href: "/reports", node: <ReportsView data={f.reports} /> },
     income: { href: "/income", node: <IncomeView data={f.income} today={f.today} /> },
-    "income-empty": { href: "/income", node: <IncomeView data={{ sources: [], entries: [], monthlyRecurringCents: 0 }} today={f.today} /> },
+    "income-empty": {
+      href: "/income",
+      node: <IncomeView data={{ sources: [], entries: [], monthlyRecurringCents: 0 }} today={f.today} />,
+    },
     accounts: { href: "/accounts", node: <AccountsView items={f.items} now={f.now} /> },
     settings: {
       href: "/settings",

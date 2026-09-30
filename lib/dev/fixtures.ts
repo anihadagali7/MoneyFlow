@@ -1,5 +1,6 @@
 import { computeProgress, type ActiveAlert, type BudgetsData } from "@/lib/budgets";
 import type { IncomeData } from "@/lib/reports/incomeData";
+import type { SubscriptionsData, SubscriptionView } from "@/lib/subscriptions";
 import type { MonthRow, ReportData } from "@/lib/reports/summary";
 import type { DashboardData, ItemSummary, TransactionsData, TxnRow } from "@/lib/views/data";
 
@@ -153,7 +154,52 @@ const alerts: ActiveAlert[] = [
   },
 ];
 
+function sub(
+  id: string,
+  name: string,
+  amountCents: number,
+  nextDate: string,
+  extra: Partial<SubscriptionView> = {},
+): SubscriptionView {
+  return {
+    id,
+    name,
+    category: "Streaming Subscriptions",
+    frequency: "monthly",
+    frequencyLabel: "Monthly",
+    amountCents,
+    monthlyCents: amountCents,
+    lastDate: "2026-09-10",
+    nextDate,
+    occurrences: 8,
+    active: true,
+    priceIncrease: null,
+    ...extra,
+  };
+}
+const activeSubs = [
+  sub("s1", "Equinox", 245_00, "2026-10-01", { category: "Fitness & Gym" }),
+  sub("s2", "Netflix", 17_99, "2026-10-10", { priceIncrease: { fromCents: 15_49, toCents: 17_99 } }),
+  sub("s3", "Spotify", 11_99, "2026-09-24"),
+  sub("s4", "iCloud+", 2_99, "2026-09-22", { category: "Software & Apps" }),
+  sub("s5", "Amazon Prime", 139_00, "2027-03-15", {
+    frequency: "annually",
+    frequencyLabel: "Yearly",
+    monthlyCents: 11_58,
+    category: "Shopping",
+  }),
+];
+const subscriptions: SubscriptionsData = {
+  active: activeSubs,
+  stopped: [sub("s6", "Hulu", 7_99, "2026-08-02", { active: false, lastDate: "2026-07-02" })],
+  monthlyCents: activeSubs.reduce((a, s) => a + s.monthlyCents, 0),
+  yearlyCents: activeSubs.reduce((a, s) => a + s.monthlyCents, 0) * 12,
+  upcoming: [activeSubs[3], activeSubs[2]],
+  priceIncreases: [activeSubs[1]],
+};
+
 export const fixtures = {
+  subscriptions,
   budgets: budgetsData,
   alerts,
   today: "2026-09-30",

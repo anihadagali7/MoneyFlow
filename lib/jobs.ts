@@ -2,6 +2,7 @@ import "server-only";
 import { evaluateBudgetAlerts, loadBudgets } from "@/lib/budgets";
 import { createClaudeCategorizer } from "@/lib/categorize/llm";
 import { reclassifyCardPayments } from "@/lib/categorize/payments";
+import { refreshSubscriptions } from "@/lib/subscriptions";
 import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { categorizeUncategorized, type CategorizeResult } from "@/lib/categorize/pipeline";
 import { getKeyProvider } from "@/lib/crypto/keyProvider";
@@ -24,6 +25,7 @@ export function refreshUser(userId: string, opts: { itemIds?: string[] } = {}) {
     await fixCardPayments(userId);
     const categorized = await categorizeForUser(userId);
     await checkBudgets(userId);
+    await detectSubscriptions(userId);
     return { synced, categorized };
   });
 }
@@ -109,5 +111,17 @@ export async function fixCardPayments(userId: string) {
     await withUser(userId, async (tx) => reclassifyCardPayments(tx, await loadUserCrypto(tx, getKeyProvider(), userId)));
   } catch (err) {
     console.error("card payment check failed", { error: (err as Error).message });
+  }
+}
+
+/** Re-detects recurring charges (runs after categorization so payments are excluded). */
+export async function detectSubscriptions(userId: string) {
+  try {
+    await withUser(userId, async (tx) => {
+      const today = todayIn(await loadTimezone(tx, userId));
+      await refreshSubscriptions(tx, await loadUserCrypto(tx, getKeyProvider(), userId), today);
+    });
+  } catch (err) {
+    console.error("subscription detection failed", { error: (err as Error).message });
   }
 }

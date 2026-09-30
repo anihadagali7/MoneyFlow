@@ -110,20 +110,36 @@ export const tags = pgTable("tags", {
   kind: text("kind").notNull().default("custom"), // custom | trip | project
 });
 
-export const recurringStreams = pgTable("recurring_streams", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  plaidStreamId: text("plaid_stream_id").unique(),
-  merchantHash: bytea("merchant_hash"),
-  merchantCt: bytea("merchant_ct"),
-  frequency: text("frequency"),
-  avgAmountCents: cents("avg_amount_cents"),
-  lastDate: date("last_date"),
-  isActive: boolean("is_active").notNull().default(true),
-  categoryId: uuid("category_id").references(() => categories.id),
-});
+/** Recurring charges (subscriptions, bills), detected from transaction history (lib/subscriptions). */
+export const recurringStreams = pgTable(
+  "recurring_streams",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    plaidStreamId: text("plaid_stream_id").unique(),
+    merchantHash: bytea("merchant_hash"),
+    merchantCt: bytea("merchant_ct"),
+    frequency: text("frequency"),
+    avgAmountCents: cents("avg_amount_cents"),
+    lastDate: date("last_date"),
+    isActive: boolean("is_active").notNull().default(true),
+    categoryId: uuid("category_id").references(() => categories.id),
+    firstDate: date("first_date"),
+    nextDate: date("next_date"),
+    occurrences: integer("occurrences"),
+    lastAmountCents: cents("last_amount_cents"),
+    prevAmountCents: cents("prev_amount_cents"),
+    monthlyCents: cents("monthly_cents"),
+    /** The user said "not a subscription"; kept so detection doesn't bring it back. */
+    dismissed: boolean("dismissed").notNull().default(false),
+    /** Price the user has already been told about, so a price-increase alert shows once. */
+    priceAckCents: cents("price_ack_cents"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("recurring_streams_user_merchant_unique").on(t.userId, t.merchantHash)],
+);
 
 // ============ Transactions ============
 

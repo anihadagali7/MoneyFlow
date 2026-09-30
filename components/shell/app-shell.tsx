@@ -9,6 +9,7 @@ import {
   CreditCardIcon,
   LayoutDashboardIcon,
   PiggyBankIcon,
+  RepeatIcon,
   SettingsIcon,
   WalletIcon,
 } from "lucide-react";
@@ -21,6 +22,7 @@ export const NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon, mobile: true },
   { href: "/transactions", label: "Transactions", icon: ArrowLeftRightIcon, mobile: true },
   { href: "/budgets", label: "Budgets", icon: PiggyBankIcon, mobile: true },
+  { href: "/subscriptions", label: "Subscriptions", icon: RepeatIcon, mobile: false },
   { href: "/reports", label: "Reports", icon: ChartColumnIcon, mobile: true },
   { href: "/income", label: "Income", icon: WalletIcon, mobile: true },
   // On phones, Cards lives under Settings to keep the tab bar to five.

@@ -13,6 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState } from "@/components/empty-state";
 import { formatCents } from "@/lib/money";
 import type { ActiveAlert, BudgetsData } from "@/lib/budgets";
+import type { SubscriptionsData } from "@/lib/subscriptions";
+import { shortDate } from "@/lib/views/dates";
 import type { DashboardData } from "@/lib/views/data";
 
 export function DashboardView({
@@ -20,11 +22,13 @@ export function DashboardView({
   today,
   budgets,
   alerts = [],
+  subscriptions,
 }: {
   data: DashboardData;
   today: string;
   budgets?: BudgetsData;
   alerts?: ActiveAlert[];
+  subscriptions?: SubscriptionsData;
 }) {
   if (data.items.length === 0) {
     return (
@@ -140,6 +144,7 @@ export function DashboardView({
       <div className="mt-4 grid items-start gap-4 lg:grid-cols-5">
         <div className="flex flex-col gap-4 lg:col-span-2">
           {budgets && <BudgetsSummary budgets={budgets} />}
+          {subscriptions && <SubscriptionsSummary data={subscriptions} />}
           <Card>
             <CardHeader>
               <CardTitle>Top categories</CardTitle>
@@ -227,5 +232,40 @@ function BudgetsSummary({ budgets }: { budgets: BudgetsData }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** Monthly subscription cost, what's due this week, and any price increases. */
+function SubscriptionsSummary({ data }: { data: SubscriptionsData }) {
+  if (data.active.length === 0) return null;
+  return (
+    <Link href="/subscriptions">
+      <Card className="gap-3 transition-colors hover:bg-muted/40">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardDescription>Subscriptions</CardDescription>
+            <CardTitle className="text-2xl">
+              {formatCents(data.monthlyCents)}
+              <span className="text-sm font-normal text-muted-foreground"> /month · {data.active.length} active</span>
+            </CardTitle>
+          </div>
+          <ArrowRightIcon className="size-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent className="flex flex-col gap-1 text-sm text-muted-foreground">
+          {data.priceIncreases.length > 0 && (
+            <span className="text-destructive">
+              {data.priceIncreases.length === 1
+                ? `${data.priceIncreases[0].name} raised its price`
+                : `${data.priceIncreases.length} subscriptions raised their price`}
+            </span>
+          )}
+          <span>
+            {data.upcoming.length
+              ? `Next: ${data.upcoming[0].name}, ${formatCents(data.upcoming[0].amountCents)} on ${shortDate(data.upcoming[0].nextDate)}`
+              : "Nothing due in the next 7 days"}
+          </span>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
