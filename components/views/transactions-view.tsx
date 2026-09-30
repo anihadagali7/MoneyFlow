@@ -26,8 +26,8 @@ export function TransactionsView({ data, today }: { data: TransactionsData; toda
         title="Transactions"
         description={
           <>
-            {data.rows.length} transaction{data.rows.length === 1 ? "" : "s"} · {formatCents(data.totals.outCents)} out
-            {data.totals.inCents > 0 && ` · ${formatCents(data.totals.inCents)} in`}
+            {data.rows.length} transaction{data.rows.length === 1 ? "" : "s"} · {formatCents(data.totals.outCents)} spent
+            {data.totals.inCents > 0 && ` · ${formatCents(data.totals.inCents)} refunds & credits`}
           </>
         }
         actions={

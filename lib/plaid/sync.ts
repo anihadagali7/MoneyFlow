@@ -1,6 +1,7 @@
 import { eq, inArray, ne, sql } from "drizzle-orm";
 import type { AccountBase, RemovedTransaction, Transaction as PlaidTransaction } from "plaid";
 import type { KeyProvider } from "@/lib/crypto/keyProvider";
+import { isCardPayment } from "@/lib/categorize/payments";
 import { loadUserCrypto, type UserCrypto } from "@/lib/crypto/userCrypto";
 import type { Tx } from "@/lib/db/core";
 import { accounts, categories, plaidItems, transactions, transactionTags } from "@/lib/db/schema";
@@ -164,10 +165,11 @@ export async function applySyncUpdates(
       .onConflictDoUpdate({ target: accounts.plaidAccountId, set: values });
   }
   const accountRows = await tx
-    .select({ id: accounts.id, plaidAccountId: accounts.plaidAccountId })
+    .select({ id: accounts.id, plaidAccountId: accounts.plaidAccountId, type: accounts.type })
     .from(accounts)
     .where(eq(accounts.itemId, itemId));
   const accountIdByPlaid = new Map(accountRows.map((a) => [a.plaidAccountId, a.id]));
+  const accountTypeByPlaid = new Map(accountRows.map((a) => [a.plaidAccountId, a.type]));
 
   const categoryIds = await loadCategoryIds(tx);
   const buildRows = (list: PlaidTransaction[]) =>
@@ -199,7 +201,23 @@ export async function applySyncUpdates(
     carried.push({ fromId: prev.id, plaidTransactionId: row.plaidTransactionId });
   }
 
-  // 3. Plaid's own category when it's very confident; the LLM handles the rest.
+  // 3. Card payments are never spending (rule, not LLM). Then Plaid's own category
+  //    when it's very confident; the LLM handles the rest.
+  const transferId = categoryIds.get("payments_transfers");
+  for (const { plaid, row } of [...addedRows, ...modifiedRows]) {
+    if (row.categorySource === "user") continue;
+    const payment = isCardPayment({
+      amountCents: row.amountCents,
+      accountType: accountTypeByPlaid.get(plaid.account_id) ?? null,
+      pfcPrimary: row.plaidPfcPrimary,
+      pfcDetailed: row.plaidPfcDetailed,
+      description: plaid.name || plaid.original_description || "",
+      merchantName: plaid.merchant_name ?? null,
+    });
+    if (payment && transferId) {
+      Object.assign(row, { categoryId: transferId, categorySource: "rule", categoryConfidence: 1, needsReview: false });
+    }
+  }
   for (const { plaid, row } of [...addedRows, ...modifiedRows]) {
     if (row.categoryId) continue;
     const slug = mapPfcToSlug(plaid.personal_finance_category);

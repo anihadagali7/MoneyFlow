@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, isNull, lt, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNull, lt, ne, or, type SQL } from "drizzle-orm";
 import type { UserCrypto } from "@/lib/crypto/userCrypto";
 import type { Tx } from "@/lib/db/core";
 import { accounts, categories, plaidItems, transactions } from "@/lib/db/schema";
@@ -34,6 +34,8 @@ export type TxnRow = {
   categoryId: string | null;
   categoryName: string | null;
   needsReview: boolean;
+  /** Card payments and transfers: shown, but never counted as spending or income. */
+  isTransfer: boolean;
 };
 export type CategoryRef = { id: string; slug: string; name: string };
 
@@ -70,6 +72,7 @@ async function loadTxnRows(tx: Tx, crypto: UserCrypto, where: SQL | undefined, l
         accountId: transactions.accountId,
         categoryId: transactions.categoryId,
         categoryName: categories.name,
+        categoryKind: categories.kind,
         needsReview: transactions.needsReview,
       })
       .from(transactions)
@@ -94,6 +97,7 @@ async function loadTxnRows(tx: Tx, crypto: UserCrypto, where: SQL | undefined, l
       categoryId: r.categoryId,
       categoryName: r.categoryName,
       needsReview: r.needsReview,
+      isTransfer: r.categoryKind === "transfer",
     };
   });
 }
@@ -125,7 +129,8 @@ export async function loadDashboard(tx: Tx, crypto: UserCrypto, today: Today): P
     spendByCategory(tx, from, to),
     tx.select({ n: count() }).from(transactions).where(isNull(transactions.categoryId)),
     tx.select({ n: count() }).from(transactions).where(eq(transactions.needsReview, true)),
-    loadTxnRows(tx, crypto, undefined, 8),
+    // Card payments are noise on the overview; they're still on the Transactions page.
+    loadTxnRows(tx, crypto, or(isNull(categories.kind), ne(categories.kind, "transfer")), 8),
     loadItems(tx, crypto),
   ]);
 
@@ -199,9 +204,10 @@ export async function loadTransactions(
     categories: categoryRows,
     cards: cards.map(({ id, label }) => ({ id, label })),
     rows: filtered,
+    // Card payments are moving money, not spending or income, so they're left out.
     totals: {
-      outCents: filtered.filter((r) => r.amountCents > 0).reduce((a, r) => a + r.amountCents, 0),
-      inCents: filtered.filter((r) => r.amountCents < 0).reduce((a, r) => a - r.amountCents, 0),
+      outCents: filtered.filter((r) => r.amountCents > 0 && !r.isTransfer).reduce((a, r) => a + r.amountCents, 0),
+      inCents: filtered.filter((r) => r.amountCents < 0 && !r.isTransfer).reduce((a, r) => a - r.amountCents, 0),
     },
   };
 }

@@ -1,10 +1,15 @@
 import "server-only";
+import { evaluateBudgetAlerts, loadBudgets } from "@/lib/budgets";
 import { createClaudeCategorizer } from "@/lib/categorize/llm";
+import { reclassifyCardPayments } from "@/lib/categorize/payments";
+import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { categorizeUncategorized, type CategorizeResult } from "@/lib/categorize/pipeline";
 import { getKeyProvider } from "@/lib/crypto/keyProvider";
 import { withUser } from "@/lib/db";
 import { fetchSyncPage } from "@/lib/plaid/client";
 import { listSyncableItems, syncItem, type RunAsUser, type SyncItemResult } from "@/lib/plaid/sync";
+import { loadTimezone } from "@/lib/user";
+import { todayIn } from "@/lib/time";
 
 const run: RunAsUser = (userId, fn) => withUser(userId, fn);
 
@@ -16,7 +21,9 @@ const run: RunAsUser = (userId, fn) => withUser(userId, fn);
 export function refreshUser(userId: string, opts: { itemIds?: string[] } = {}) {
   return oncePerUser(inFlightRefresh, userId, async () => {
     const synced = await syncUser(userId, opts);
+    await fixCardPayments(userId);
     const categorized = await categorizeForUser(userId);
+    await checkBudgets(userId);
     return { synced, categorized };
   });
 }
@@ -82,4 +89,25 @@ export function shouldRefresh(
     (i) => i.status === "active" && (!i.lastSyncedAt || now - i.lastSyncedAt.getTime() > STALE_MS),
   );
   return stale || uncategorized > 0;
+}
+
+/** Records any budget that newly crossed 80% or 100% this month (shown as alerts on Overview). */
+export async function checkBudgets(userId: string) {
+  try {
+    await withUser(userId, async (tx) => {
+      const today = todayIn(await loadTimezone(tx, userId));
+      await evaluateBudgetAlerts(tx, userId, await loadBudgets(tx, today));
+    });
+  } catch (err) {
+    console.error("budget check failed", { error: (err as Error).message });
+  }
+}
+
+/** Makes sure card payments (including ones labeled before this rule existed) never count as spending. */
+export async function fixCardPayments(userId: string) {
+  try {
+    await withUser(userId, async (tx) => reclassifyCardPayments(tx, await loadUserCrypto(tx, getKeyProvider(), userId)));
+  } catch (err) {
+    console.error("card payment check failed", { error: (err as Error).message });
+  }
 }

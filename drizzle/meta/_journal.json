@@ -29,6 +29,20 @@
       "when": 1790773151254,
       "tag": "0003_rate_limits_rls_and_cron",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790774081989,
+      "tag": "0004_budgets",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790774082554,
+      "tag": "0005_budgets_rls",
+      "breakpoints": true
     }
   ]
 }

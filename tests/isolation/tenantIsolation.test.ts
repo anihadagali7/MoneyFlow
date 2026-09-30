@@ -25,6 +25,8 @@ const USER_TABLES = {
   income_entries: s.incomeEntries,
   audit_log: s.auditLog,
   rate_limits: s.rateLimits,
+  budgets: s.budgets,
+  budget_alerts: s.budgetAlerts,
 } as const;
 
 const provider = new LocalKeyProvider(randomBytes(32));
@@ -97,6 +99,8 @@ async function seedUser(userId: string) {
     });
     await tx.insert(s.auditLog).values({ userId, action: "test.seed" });
     await tx.insert(s.rateLimits).values({ userId, action: "sync", windowStart: new Date(), count: 1 });
+    const [budget] = await tx.insert(s.budgets).values({ userId, categoryId: category.id, amountCents: 100_00 }).returning();
+    await tx.insert(s.budgetAlerts).values({ userId, budgetId: budget.id, month: "2026-09", threshold: 80 });
     ids[userId] = { itemId: item.id, plaidItemId, txnId: txn.id, categoryId: category.id };
   });
 }

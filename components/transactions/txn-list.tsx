@@ -92,7 +92,7 @@ export function TxnList({
                     </div>
                   )}
                 </div>
-                <TxnAmount cents={r.amountCents} className="text-sm font-medium" />
+                <TxnAmount cents={r.amountCents} transfer={r.isTransfer} className="text-sm font-medium" />
                 {trailing && <div className="hidden shrink-0 sm:block">{trailing(r)}</div>}
                 {rowAction?.(r)}
               </li>

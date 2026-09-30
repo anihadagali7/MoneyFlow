@@ -1,11 +1,14 @@
 import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
-/** A transaction amount. Plaid sign: positive = money out. Money in shows "+" in the positive color. */
-export function TxnAmount({ cents, className }: { cents: number; className?: string }) {
-  const incoming = cents < 0;
+/**
+ * A transaction amount. Plaid sign: positive = money out. Refunds and credits show "+" in the
+ * positive color; card payments (transfers) are neutral, since they're neither.
+ */
+export function TxnAmount({ cents, transfer = false, className }: { cents: number; transfer?: boolean; className?: string }) {
+  const incoming = cents < 0 && !transfer;
   return (
-    <span className={cn("tabular", incoming && "text-positive", className)}>
+    <span className={cn("tabular", incoming && "text-positive", transfer && "text-muted-foreground", className)}>
       {incoming ? "+" : ""}
       {formatCents(Math.abs(cents))}
     </span>

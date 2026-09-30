@@ -3,18 +3,28 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { ArrowLeftRightIcon, ChartColumnIcon, CreditCardIcon, LayoutDashboardIcon, SettingsIcon, WalletIcon } from "lucide-react";
+import {
+  ArrowLeftRightIcon,
+  ChartColumnIcon,
+  CreditCardIcon,
+  LayoutDashboardIcon,
+  PiggyBankIcon,
+  SettingsIcon,
+  WalletIcon,
+} from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 
 export const NAV = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon },
-  { href: "/transactions", label: "Transactions", icon: ArrowLeftRightIcon },
-  { href: "/reports", label: "Reports", icon: ChartColumnIcon },
-  { href: "/income", label: "Income", icon: WalletIcon },
-  { href: "/accounts", label: "Cards", icon: CreditCardIcon },
+  { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon, mobile: true },
+  { href: "/transactions", label: "Transactions", icon: ArrowLeftRightIcon, mobile: true },
+  { href: "/budgets", label: "Budgets", icon: PiggyBankIcon, mobile: true },
+  { href: "/reports", label: "Reports", icon: ChartColumnIcon, mobile: true },
+  { href: "/income", label: "Income", icon: WalletIcon, mobile: true },
+  // On phones, Cards lives under Settings to keep the tab bar to five.
+  { href: "/accounts", label: "Cards", icon: CreditCardIcon, mobile: false },
 ] as const;
 
 function SettingsLink({ active }: { active: boolean }) {
@@ -90,7 +100,7 @@ export function AppShell({ children, user, activeHref }: { children: ReactNode; 
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-background/90 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg md:hidden"
       >
-        {NAV.map(({ href, label, icon: Icon }) => (
+        {NAV.filter((n) => n.mobile).map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}

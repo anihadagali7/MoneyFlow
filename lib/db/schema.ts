@@ -244,6 +244,43 @@ export const webhookEvents = pgTable("webhook_events", {
   processedAt: timestamp("processed_at", { withTimezone: true }),
 });
 
+// ============ Budgets ============
+
+/** Monthly spending limits. category_id NULL = the total across all spend categories. */
+export const budgets = pgTable(
+  "budgets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id").references(() => categories.id, { onDelete: "cascade" }),
+    amountCents: cents("amount_cents").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique().on(t.userId, t.categoryId).nullsNotDistinct()],
+);
+
+/** One row per budget, month and threshold crossed (80 or 100), so each alert fires once. */
+export const budgetAlerts = pgTable(
+  "budget_alerts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    budgetId: uuid("budget_id")
+      .notNull()
+      .references(() => budgets.id, { onDelete: "cascade" }),
+    month: text("month").notNull(), // "YYYY-MM"
+    threshold: integer("threshold").notNull(), // 80 | 100
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+  },
+  (t) => [unique().on(t.budgetId, t.month, t.threshold)],
+);
+
 /** Fixed-window counters for rate-limited actions (lib/rate-limit.ts). */
 export const rateLimits = pgTable(
   "rate_limits",

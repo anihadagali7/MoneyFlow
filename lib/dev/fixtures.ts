@@ -1,3 +1,4 @@
+import { computeProgress, type ActiveAlert, type BudgetsData } from "@/lib/budgets";
 import type { IncomeData } from "@/lib/reports/incomeData";
 import type { MonthRow, ReportData } from "@/lib/reports/summary";
 import type { DashboardData, ItemSummary, TransactionsData, TxnRow } from "@/lib/views/data";
@@ -32,7 +33,14 @@ const months: MonthRow[] = [
   netCents: (incomeCents as number) - (spendCents as number),
 }));
 
-function txn(id: number, date: string, merchant: string, amountCents: number, slug: string | null, extra: Partial<TxnRow> = {}): TxnRow {
+function txn(
+  id: number,
+  date: string,
+  merchant: string,
+  amountCents: number,
+  slug: string | null,
+  extra: Partial<TxnRow> = {},
+): TxnRow {
   const c = slug ? cat(slug) : null;
   return {
     id: `10000000-0000-4000-8000-${String(id).padStart(12, "0")}`,
@@ -45,6 +53,7 @@ function txn(id: number, date: string, merchant: string, amountCents: number, sl
     categoryId: c?.id ?? null,
     categoryName: c?.name ?? null,
     needsReview: false,
+    isTransfer: slug === "payments_transfers",
     ...extra,
   };
 }
@@ -54,7 +63,11 @@ const rows: TxnRow[] = [
   txn(2, "2026-09-30", "Whole Foods Market", 142_18, "groceries"),
   txn(3, "2026-09-29", "Uber", 23_40, "transport_rideshare"),
   txn(4, "2026-09-29", "Netflix", 15_49, "subscriptions_streaming"),
-  txn(5, "2026-09-28", "JMK LLC", 64_00, "shopping_general", { needsReview: true, merchant: "JMK LLC 8827", description: "JMK LLC 8827 BROOKLYN NY" }),
+  txn(5, "2026-09-28", "JMK LLC", 64_00, "shopping_general", {
+    needsReview: true,
+    merchant: "JMK LLC 8827",
+    description: "JMK LLC 8827 BROOKLYN NY",
+  }),
   txn(6, "2026-09-27", "Delta Air Lines", 412_60, "travel_flights"),
   txn(7, "2026-09-27", "Amazon", -38_99, "shopping_general"),
   txn(8, "2026-09-26", "Capital One Payment", -1250_00, "payments_transfers"),
@@ -62,11 +75,87 @@ const rows: TxnRow[] = [
 ];
 
 const items: ItemSummary[] = [
-  { id: "item-1", institutionName: "Capital One", status: "active", lastSyncedAt: "2026-09-30T07:40:00Z", cards: ["Venture X ••4821", "Quicksilver ••1190"] },
-  { id: "item-2", institutionName: "Chase", status: "login_required", lastSyncedAt: "2026-09-27T12:00:00Z", cards: ["Sapphire Preferred ••7703"] },
+  {
+    id: "item-1",
+    institutionName: "Capital One",
+    status: "active",
+    lastSyncedAt: "2026-09-30T07:40:00Z",
+    cards: ["Venture X ••4821", "Quicksilver ••1190"],
+  },
+  {
+    id: "item-2",
+    institutionName: "Chase",
+    status: "login_required",
+    lastSyncedAt: "2026-09-27T12:00:00Z",
+    cards: ["Sapphire Preferred ••7703"],
+  },
+];
+
+const today = { iso: "2026-09-20", month: { year: 2026, month: 9 } };
+function budget(id: string, slug: string | null, name: string, limitCents: number, spentCents: number) {
+  return {
+    id,
+    categoryId: slug ? `cat-${slug}` : null,
+    slug,
+    name,
+    limitCents,
+    spentCents,
+    progress: computeProgress(limitCents, spentCents, today),
+  };
+}
+const budgetsData: BudgetsData = {
+  monthKey: "2026-09",
+  monthName: "September",
+  daysLeft: 11,
+  total: budget("b0", null, "Total spending", 4000_00, 2984_31),
+  budgets: [
+    budget("b1", "dining", "Restaurants & Dining", 400_00, 452_18),
+    budget("b2", "groceries", "Groceries", 900_00, 742_40),
+    budget("b3", "shopping_general", "Shopping", 300_00, 212_05),
+    budget("b4", "subscriptions_streaming", "Streaming Subscriptions", 80_00, 64_96),
+  ],
+  suggestions: [
+    {
+      categoryId: "cat-travel_flights",
+      slug: "travel_flights",
+      name: "Flights",
+      averageCents: 650_00,
+      thisMonthCents: 412_60,
+    },
+    { categoryId: "cat-coffee", slug: "coffee", name: "Coffee & Snacks", averageCents: 62_00, thisMonthCents: 48_30 },
+  ],
+  spendCategories: [
+    { id: "cat-travel_flights", name: "Flights" },
+    { id: "cat-coffee", name: "Coffee & Snacks" },
+  ],
+  averages: { "cat-travel_flights": 650_00, "cat-coffee": 62_00, __total: 4105_00 },
+};
+const alerts: ActiveAlert[] = [
+  {
+    id: "a1",
+    budgetId: "b1",
+    name: "Restaurants & Dining",
+    slug: "dining",
+    threshold: 100,
+    progress: budgetsData.budgets[0].progress,
+    limitCents: 400_00,
+    spentCents: 452_18,
+  },
+  {
+    id: "a2",
+    budgetId: "b2",
+    name: "Groceries",
+    slug: "groceries",
+    threshold: 80,
+    progress: budgetsData.budgets[1].progress,
+    limitCents: 900_00,
+    spentCents: 742_40,
+  },
 ];
 
 export const fixtures = {
+  budgets: budgetsData,
+  alerts,
   today: "2026-09-30",
   now: Date.parse("2026-09-30T08:10:00Z"),
   dashboard: {
@@ -100,7 +189,7 @@ export const fixtures = {
       { id: "card-2", label: "Quicksilver ••1190" },
     ],
     rows,
-    totals: { outCents: 682_67, inCents: 1288_99 },
+    totals: { outCents: 682_67, inCents: 38_99 },
   } satisfies TransactionsData,
   reports: {
     range: "6m",

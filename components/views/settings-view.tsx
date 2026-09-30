@@ -1,4 +1,5 @@
-import { DownloadIcon, GlobeIcon } from "lucide-react";
+import Link from "next/link";
+import { ChevronRightIcon, CreditCardIcon, DownloadIcon, GlobeIcon } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DeleteAccountButton } from "@/components/settings/delete-account";
 import { buttonVariants } from "@/components/ui/button";
@@ -23,6 +24,18 @@ export function SettingsView({ data, now }: { data: SettingsData; now: number })
     <>
       <PageHeader title="Settings" description="Your data and account" />
       <div className="flex flex-col gap-4">
+        <Link href="/accounts" className="md:hidden">
+          <Card className="flex-row items-center gap-3 p-4">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
+              <CreditCardIcon className="size-4" />
+            </span>
+            <div className="flex-1">
+              <div className="font-medium">Connected cards</div>
+              <div className="text-xs text-muted-foreground">Add, reconnect or disconnect banks</div>
+            </div>
+            <ChevronRightIcon className="size-4 text-muted-foreground" />
+          </Card>
+        </Link>
         <Card>
           <CardHeader>
             <CardTitle>Timezone</CardTitle>

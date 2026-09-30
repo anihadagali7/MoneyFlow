@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/shell/app-shell";
 import { AccountsView } from "@/components/views/accounts-view";
+import { BudgetsView } from "@/components/views/budgets-view";
+import { budgetDialogOptions } from "@/lib/budgets";
 import { DashboardView } from "@/components/views/dashboard-view";
 import { IncomeView } from "@/components/views/income-view";
 import { ReportsView } from "@/components/views/reports-view";
@@ -10,7 +12,7 @@ import { fixtures } from "@/lib/dev/fixtures";
 
 /**
  * Development-only: renders each signed-in screen with sample data, for design review
- * without an account. 404s in production. /dev/preview?view=dashboard|transactions|reports|income|accounts|settings|empty
+ * without an account. 404s in production. /dev/preview?view=dashboard|transactions|budgets|reports|income|accounts|settings|empty
  */
 export default async function PreviewPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   if (process.env.NODE_ENV === "production") notFound();
@@ -18,7 +20,20 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
   const f = fixtures;
 
   const screens: Record<string, { href: string; node: React.ReactNode }> = {
-    dashboard: { href: "/dashboard", node: <DashboardView data={f.dashboard} today={f.today} /> },
+    dashboard: {
+      href: "/dashboard",
+      node: <DashboardView data={f.dashboard} today={f.today} budgets={f.budgets} alerts={f.alerts} />,
+    },
+    budgets: { href: "/budgets", node: <BudgetsView data={f.budgets} options={budgetDialogOptions(f.budgets)} /> },
+    "budgets-empty": {
+      href: "/budgets",
+      node: (
+        <BudgetsView
+          data={{ ...f.budgets, budgets: [], total: null }}
+          options={budgetDialogOptions({ ...f.budgets, budgets: [], total: null })}
+        />
+      ),
+    },
     empty: { href: "/dashboard", node: <DashboardView data={{ ...f.dashboard, items: [] }} today={f.today} /> },
     transactions: { href: "/transactions", node: <TransactionsView data={f.transactions} today={f.today} /> },
     reports: { href: "/reports", node: <ReportsView data={f.reports} /> },
