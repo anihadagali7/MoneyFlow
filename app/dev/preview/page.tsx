@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/shell/app-shell";
 import { AccountsView } from "@/components/views/accounts-view";
 import { BudgetsView } from "@/components/views/budgets-view";
+import { GoalDetailView } from "@/components/views/goal-detail-view";
+import { GoalsView } from "@/components/views/goals-view";
 import { budgetDialogOptions } from "@/lib/budgets";
 import { DashboardView } from "@/components/views/dashboard-view";
 import { IncomeView } from "@/components/views/income-view";
@@ -15,7 +17,7 @@ import { fixtures } from "@/lib/dev/fixtures";
 
 /**
  * Development-only: renders each signed-in screen with sample data, for design review
- * without an account. 404s in production. /dev/preview?view=dashboard|transactions|budgets|subscriptions|trips|trip|reports|income|accounts|settings|empty
+ * without an account. 404s in production. /dev/preview?view=dashboard|transactions|budgets|goals|goal|subscriptions|trips|trip|reports|income|accounts|settings|empty
  */
 export default async function PreviewPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   if (process.env.NODE_ENV === "production") notFound();
@@ -33,6 +35,24 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
           alerts={f.alerts}
           subscriptions={f.subscriptions}
           tripSuggestion={f.trips.suggestions[0]}
+          goals={f.goals}
+        />
+      ),
+    },
+    goals: { href: "/goals", node: <GoalsView data={f.goals} today="2026-09-30" /> },
+    goal: {
+      href: "/goals",
+      node: (
+        <GoalDetailView
+          goal={f.goals.goals[0]}
+          accounts={f.goals.savingsAccounts}
+          avgNetCents={f.goals.avgNetCents}
+          today="2026-09-30"
+          history={[
+            { id: "h1", amountCents: 400_00, date: "2026-09-15", note: "September" },
+            { id: "h2", amountCents: -150_00, date: "2026-08-20", note: "Concert tickets" },
+            { id: "h3", amountCents: 1900_00, date: "2026-06-01", note: "Starting amount" },
+          ]}
         />
       ),
     },

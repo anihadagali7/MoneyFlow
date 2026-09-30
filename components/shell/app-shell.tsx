@@ -12,6 +12,7 @@ import {
   PlaneIcon,
   RepeatIcon,
   SettingsIcon,
+  TargetIcon,
   WalletIcon,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
@@ -23,6 +24,7 @@ export const NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon, mobile: true },
   { href: "/transactions", label: "Transactions", icon: ArrowLeftRightIcon, mobile: true },
   { href: "/budgets", label: "Budgets", icon: PiggyBankIcon, mobile: true },
+  { href: "/goals", label: "Goals", icon: TargetIcon, mobile: false },
   { href: "/subscriptions", label: "Subscriptions", icon: RepeatIcon, mobile: false },
   { href: "/trips", label: "Trips", icon: PlaneIcon, mobile: false },
   { href: "/reports", label: "Reports", icon: ChartColumnIcon, mobile: true },
@@ -48,10 +50,20 @@ function SettingsLink({ active }: { active: boolean }) {
  * Signed-in layout: a sidebar on desktop, a top bar plus bottom tab bar on phones.
  * `user` is the account menu (Clerk's UserButton in the app).
  */
-export function AppShell({ children, user, activeHref }: { children: ReactNode; user?: ReactNode; activeHref?: string }) {
+export function AppShell({
+  children,
+  user,
+  activeHref,
+}: {
+  children: ReactNode;
+  user?: ReactNode;
+  activeHref?: string;
+}) {
   const pathname = usePathname();
   const active = activeHref ?? pathname;
   const isActive = (href: string) => active === href || active.startsWith(`${href}/`);
+  // On phones Budgets and Goals share a tab.
+  const isActiveTab = (href: string) => isActive(href) || (href === "/budgets" && isActive("/goals"));
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[232px_1fr]">
@@ -108,13 +120,18 @@ export function AppShell({ children, user, activeHref }: { children: ReactNode; 
           <Link
             key={href}
             href={href}
-            aria-current={isActive(href) ? "page" : undefined}
+            aria-current={isActiveTab(href) ? "page" : undefined}
             className={cn(
               "group flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] text-muted-foreground active:opacity-60",
-              isActive(href) && "font-medium text-foreground",
+              isActiveTab(href) && "font-medium text-foreground",
             )}
           >
-            <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", isActive(href) && "bg-muted")}>
+            <span
+              className={cn(
+                "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
+                isActiveTab(href) && "bg-muted",
+              )}
+            >
               <Icon className="size-5" />
             </span>
             {label}

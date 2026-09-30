@@ -14,6 +14,8 @@ import { EmptyState } from "@/components/empty-state";
 import { formatCents } from "@/lib/money";
 import type { ActiveAlert, BudgetsData } from "@/lib/budgets";
 import type { SubscriptionsData } from "@/lib/subscriptions";
+import type { GoalsData } from "@/lib/goals";
+import { GoalBar, GoalStatusLine } from "@/components/goals/goal-progress";
 import type { SuggestedTrip } from "@/lib/trips/detect";
 import { SuggestionActions } from "@/components/trips/trip-controls";
 import { PlaneIcon } from "lucide-react";
@@ -27,6 +29,7 @@ export function DashboardView({
   alerts = [],
   subscriptions,
   tripSuggestion,
+  goals,
 }: {
   data: DashboardData;
   today: string;
@@ -34,6 +37,7 @@ export function DashboardView({
   alerts?: ActiveAlert[];
   subscriptions?: SubscriptionsData;
   tripSuggestion?: SuggestedTrip;
+  goals?: GoalsData;
 }) {
   if (data.items.length === 0) {
     return (
@@ -158,6 +162,7 @@ export function DashboardView({
       <div className="mt-4 grid items-start gap-4 lg:grid-cols-5">
         <div className="flex flex-col gap-4 lg:col-span-2">
           {budgets && <BudgetsSummary budgets={budgets} />}
+          {goals && goals.goals.length > 0 && <GoalsSummary data={goals} />}
           {subscriptions && <SubscriptionsSummary data={subscriptions} />}
           <Card>
             <CardHeader>
@@ -281,5 +286,45 @@ function SubscriptionsSummary({ data }: { data: SubscriptionsData }) {
         </CardContent>
       </Card>
     </Link>
+  );
+}
+
+/** Up to two unfinished goals, closest to done first. */
+function GoalsSummary({ data }: { data: GoalsData }) {
+  const list = data.goals
+    .filter((g) => !g.progress.reached)
+    .sort((a, b) => b.progress.pct - a.progress.pct)
+    .slice(0, 2);
+  if (list.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>Goals</CardTitle>
+          <CardDescription>Savings progress</CardDescription>
+        </div>
+        <Link
+          href="/goals"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          All <ArrowRightIcon className="size-3.5" />
+        </Link>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {list.map((g) => (
+          <Link key={g.id} href={`/goals/${g.id}`} className="flex flex-col gap-1.5">
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="truncate">{g.name}</span>
+              <span className="shrink-0">
+                <span className="tabular font-medium">{formatCents(g.savedCents)}</span>
+                <span className="text-muted-foreground"> / {formatCents(g.targetCents)}</span>
+              </span>
+            </div>
+            <GoalBar goal={g} />
+            <GoalStatusLine goal={g} avgNetCents={data.avgNetCents} />
+          </Link>
+        ))}
+      </CardContent>
+    </Card>
   );
 }

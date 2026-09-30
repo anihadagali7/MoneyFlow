@@ -71,6 +71,20 @@
       "when": 1790786191892,
       "tag": "0009_manual_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790798911177,
+      "tag": "0010_savings_goals",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790798911758,
+      "tag": "0011_savings_goals_rls",
+      "breakpoints": true
     }
   ]
 }

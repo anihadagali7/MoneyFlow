@@ -2,6 +2,8 @@ import { computeProgress, type ActiveAlert, type BudgetsData } from "@/lib/budge
 import type { IncomeData } from "@/lib/reports/incomeData";
 import type { SubscriptionsData, SubscriptionView } from "@/lib/subscriptions";
 import type { TripDetail, TripsData } from "@/lib/trips";
+import type { GoalsData } from "@/lib/goals";
+import { computeGoalProgress } from "@/lib/goals/progress";
 import type { MonthRow, ReportData } from "@/lib/reports/summary";
 import type { DashboardData, ItemSummary, TransactionsData, TxnRow } from "@/lib/views/data";
 
@@ -285,7 +287,40 @@ const tripDetail: TripDetail = {
   addable: rows.slice(6),
 };
 
+function goal(
+  id: string,
+  name: string,
+  savedCents: number,
+  targetCents: number,
+  targetDate: string | null,
+  paceCents: number | null,
+  account: { id: string; label: string } | null = null,
+) {
+  return {
+    id,
+    name,
+    savedCents,
+    targetCents,
+    targetDate,
+    account,
+    progress: computeGoalProgress({ savedCents, targetCents, targetDate, today: "2026-09-30", paceCents }),
+  };
+}
+const goals: GoalsData = {
+  avgNetCents: 1850_00,
+  savingsAccounts: [{ id: "sav-1", label: "360 Savings ••7710", balanceCents: 8200_00 }],
+  goals: [
+    goal("g1", "Japan 2027", 2150_00, 6000_00, "2027-04-01", 350_00),
+    goal("g2", "Emergency fund", 8200_00, 15000_00, "2027-12-31", 1850_00, {
+      id: "sav-1",
+      label: "360 Savings ••7710",
+    }),
+    goal("g3", "New laptop", 2400_00, 2400_00, null, null),
+  ],
+};
+
 export const fixtures = {
+  goals,
   trips,
   tripDetail,
   subscriptions,

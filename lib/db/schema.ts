@@ -302,6 +302,38 @@ export const budgetAlerts = pgTable(
   (t) => [unique().on(t.budgetId, t.month, t.threshold)],
 );
 
+// ============ Savings goals ============
+
+/**
+ * A savings goal. With account_id, progress is that account's balance; otherwise it's the
+ * sum of the user's logged contributions.
+ */
+export const savingsGoals = pgTable("savings_goals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  nameCt: bytea("name_ct").notNull(),
+  targetCents: cents("target_cents").notNull(),
+  targetDate: date("target_date"),
+  accountId: uuid("account_id").references(() => accounts.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const goalContributions = pgTable("goal_contributions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  goalId: uuid("goal_id")
+    .notNull()
+    .references(() => savingsGoals.id, { onDelete: "cascade" }),
+  amountCents: cents("amount_cents").notNull(), // negative = took money out
+  date: date("date").notNull(),
+  noteCt: bytea("note_ct"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Fixed-window counters for rate-limited actions (lib/rate-limit.ts). */
 export const rateLimits = pgTable(
   "rate_limits",

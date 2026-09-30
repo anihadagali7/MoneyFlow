@@ -11,6 +11,7 @@ export const LIMITS = {
   "budget.save": { limit: 60, windowSeconds: 60 },
   "trip.save": { limit: 60, windowSeconds: 60 },
   "category.edit": { limit: 30, windowSeconds: 60 },
+  "goal.save": { limit: 60, windowSeconds: 60 },
 } as const;
 export type RateLimitedAction = keyof typeof LIMITS;
 

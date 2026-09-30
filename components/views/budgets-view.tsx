@@ -1,6 +1,7 @@
 import { PiggyBankIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
+import { PlanTabs } from "@/components/plan-tabs";
 import { AddBudgetButton, BudgetMenu, type BudgetDialogOptions } from "@/components/budgets/budget-dialog";
 import { BudgetBar, BudgetStatusLine } from "@/components/budgets/budget-bar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +47,7 @@ export function BudgetsView({ data, options }: { data: BudgetsData; options: Bud
 
   return (
     <>
+      <PlanTabs active="budgets" />
       <PageHeader title="Budgets" description={description} actions={hasAny ? <AddBudgetButton options={options} /> : undefined} />
 
       {!hasAny ? (
