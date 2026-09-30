@@ -5,8 +5,9 @@ import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { runAsUser, type Db } from "@/lib/db/core";
 import { accounts, categories, incomeSources, transactions } from "@/lib/db/schema";
 import { syncItem, type SyncPage } from "@/lib/plaid/sync";
+import { dismissPayer, syncDetectedIncome } from "@/lib/income/suggest";
 import { loadIncome } from "@/lib/reports/incomeData";
-import { spendByMonth } from "@/lib/reports/summary";
+import { loadIncomeByMonth, spendByMonth } from "@/lib/reports/summary";
 import { loadItems } from "@/lib/views/data";
 import { card, page, plaidTxn, provider, runner, seedUserWithItem } from "../helpers/fixtures";
 import { createTestDb } from "../helpers/testDb";
@@ -115,12 +116,44 @@ describe("checking accounts", () => {
     });
   });
 
-  it("suggests the paycheck as income until it's added", async () => {
-    const income = () =>
-      runAsUser(db, U, async (tx) => loadIncome(tx, await loadUserCrypto(tx, provider, U), "2026-09-20"));
-    const [s] = (await income()).suggestions;
-    expect(s).toMatchObject({ name: "Acme Corp", frequency: "biweekly", amountCents: 2861_54, lastDate: "2026-09-11" });
+  it("adds the paycheck to Income automatically and counts the actual deposits", async () => {
+    const run = <T>(
+      fn: (
+        tx: Parameters<Parameters<typeof runAsUser>[2]>[0],
+        c: Awaited<ReturnType<typeof loadUserCrypto>>,
+      ) => Promise<T>,
+    ) => runAsUser(db, U, async (tx) => fn(tx, await loadUserCrypto(tx, provider, U)));
+    expect(await run((tx, c) => syncDetectedIncome(tx, c, "2026-09-20"))).toBe(1);
+    expect(await run((tx, c) => syncDetectedIncome(tx, c, "2026-09-20"))).toBe(0); // no duplicate
 
+    const data = await run((tx, c) => loadIncome(tx, c, "2026-09-20"));
+    expect(data.sources).toEqual([
+      expect.objectContaining({ label: "Acme Corp", frequency: "biweekly", amountCents: 2861_54, detected: true }),
+    ]);
+    // Reports use the deposits that arrived: two in August, one so far in September (+ Jul 31).
+    const income = await runAsUser(db, U, (tx) => loadIncomeByMonth(tx, "2026-07-01", "2026-10-01"));
+    expect(Object.fromEntries(income)).toEqual({ "2026-07": 2861_54, "2026-08": 2 * 2861_54, "2026-09": 2861_54 });
+  });
+
+  it("ends detected income when deposits stop, and 'Not income' keeps it away", async () => {
+    const run = <T>(
+      fn: (
+        tx: Parameters<Parameters<typeof runAsUser>[2]>[0],
+        c: Awaited<ReturnType<typeof loadUserCrypto>>,
+      ) => Promise<T>,
+    ) => runAsUser(db, U, async (tx) => fn(tx, await loadUserCrypto(tx, provider, U)));
+    await run((tx, c) => syncDetectedIncome(tx, c, "2026-09-20"));
+    // Two months later with no new paychecks: the source gets an end date, not deleted.
+    await run((tx, c) => syncDetectedIncome(tx, c, "2026-11-20"));
+    const [ended] = await runAsUser(db, U, (tx) => tx.select().from(incomeSources));
+    expect(ended.endDate).toBe("2026-09-11");
+
+    await run((tx, c) => dismissPayer(tx, c, ended.merchantHash!));
+    await run((tx, c) => syncDetectedIncome(tx, c, "2026-09-20"));
+    expect(await runAsUser(db, U, (tx) => tx.select().from(incomeSources))).toHaveLength(0);
+  });
+
+  it("doesn't duplicate income the user already entered by hand", async () => {
     await runAsUser(db, U, async (tx) => {
       const crypto = await loadUserCrypto(tx, provider, U);
       await tx.insert(incomeSources).values({
@@ -131,6 +164,8 @@ describe("checking accounts", () => {
         anchorDate: "2026-09-11",
       });
     });
-    expect((await income()).suggestions).toHaveLength(0);
+    expect(
+      await runAsUser(db, U, async (tx) => syncDetectedIncome(tx, await loadUserCrypto(tx, provider, U), "2026-09-20")),
+    ).toBe(0);
   });
 });

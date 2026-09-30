@@ -1,6 +1,6 @@
 import { CalendarIcon, LandmarkIcon, WalletIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
-import { AddIncomeButton, IncomeRowMenu, IncomeSuggestionActions } from "@/components/income/income-dialogs";
+import { AddIncomeButton, IncomeRowMenu } from "@/components/income/income-dialogs";
 import { PageHeader } from "@/components/page-header";
 import { StatTile } from "@/components/stat-tile";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,47 +14,15 @@ export function IncomeView({ data, today }: { data: IncomeData; today: string })
     .filter((s) => s.nextPayDate)
     .sort((a, b) => a.nextPayDate!.localeCompare(b.nextPayDate!))[0];
 
-  const found = data.suggestions.length > 0 && (
-    <Card className="mb-4">
-      <CardHeader>
-        <CardTitle>Found in your bank</CardTitle>
-        <CardDescription>
-          Regular deposits that look like pay. Add them to count toward your net each month.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ul className="divide-y">
-          {data.suggestions.map((s) => (
-            <li key={s.key} className="flex flex-wrap items-center gap-3 py-3">
-              <LandmarkIcon className="size-4 shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{s.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {formatCents(s.amountCents)} · {s.frequencyLabel.toLowerCase()} · last {shortDate(s.lastDate)}
-                </div>
-              </div>
-              <IncomeSuggestionActions
-                suggestionKey={s.key}
-                today={today}
-                prefill={{ label: s.name, amountCents: s.amountCents, frequency: s.frequency, anchorDate: s.lastDate }}
-              />
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  );
-
   if (data.sources.length === 0 && data.entries.length === 0) {
     return (
       <>
         <PageHeader title="Income" description="What comes in, so MoneyFlow can show your net each month." />
-        {found}
         <Card>
           <EmptyState
             icon={WalletIcon}
             title="Add your income"
-            description="Add your paycheck once and MoneyFlow works out every pay date, including months with three paychecks. Add bonuses or refunds as one-time income."
+            description="Link the bank account your pay goes into and MoneyFlow adds your paychecks automatically. Or add your paycheck here, plus bonuses or refunds as one-time income."
             action={<AddIncomeButton today={today} />}
           />
         </Card>
@@ -70,7 +38,6 @@ export function IncomeView({ data, today }: { data: IncomeData; today: string })
         actions={<AddIncomeButton today={today} />}
       />
 
-      {found}
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile
           label="Expected per month"
@@ -93,7 +60,7 @@ export function IncomeView({ data, today }: { data: IncomeData; today: string })
         <Card>
           <CardHeader>
             <CardTitle>Recurring</CardTitle>
-            <CardDescription>Paychecks and other scheduled income</CardDescription>
+            <CardDescription>Paychecks found in linked bank accounts are added automatically</CardDescription>
           </CardHeader>
           <CardContent>
             {data.sources.length === 0 ? (
@@ -104,6 +71,12 @@ export function IncomeView({ data, today }: { data: IncomeData; today: string })
                   <li key={s.id} className="flex items-center gap-3 py-3">
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{s.label}</div>
+                      {s.detected && (
+                        <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                          <LandmarkIcon className="size-3 shrink-0" />
+                          <span className="truncate">Auto · {s.bank ?? "bank"} deposits</span>
+                        </div>
+                      )}
                       <div className="text-xs text-muted-foreground">
                         {s.frequencyLabel}
                         {s.nextPayDate

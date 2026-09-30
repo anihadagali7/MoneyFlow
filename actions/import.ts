@@ -8,7 +8,7 @@ import { withUser } from "@/lib/db";
 import { allow } from "@/lib/guard";
 import { applyImport, previewImport } from "@/lib/import";
 import { ImportError, parseTransactionsCsv, type ImportRow } from "@/lib/import/csv";
-import { categorizeForUser, checkBudgets, detectSubscriptions } from "@/lib/jobs";
+import { categorizeForUser, checkBudgets, detectIncome, detectSubscriptions } from "@/lib/jobs";
 import { loadUserContext } from "@/lib/user";
 
 const MAX_CHARS = 1_500_000;
@@ -77,6 +77,7 @@ export async function importCsv(
     // Label what rules and the cache didn't, then refresh what depends on history.
     after(async () => {
       await categorizeForUser(userId);
+      await detectIncome(userId);
       await checkBudgets(userId);
       await detectSubscriptions(userId);
     });

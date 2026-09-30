@@ -408,6 +408,8 @@ export const fixtures = {
         endDate: null,
         monthlyCents: 6200_00,
         nextPayDate: "2026-10-09",
+        detected: true,
+        bank: "Chase",
       },
     ],
     entries: [
@@ -415,17 +417,6 @@ export const fixtures = {
       { id: "e2", label: "Tax refund", amountCents: 842_00, receivedOn: "2026-04-02" },
     ],
     monthlyRecurringCents: 6200_00,
-    suggestions: [
-      {
-        key: "a".repeat(64),
-        name: "ACME CORP PAYROLL",
-        frequency: "biweekly",
-        frequencyLabel: "Every 2 weeks",
-        amountCents: 2861_54,
-        monthlyCents: 6200_00,
-        lastDate: "2026-09-26",
-      },
-    ],
   } satisfies IncomeData,
   items,
 };

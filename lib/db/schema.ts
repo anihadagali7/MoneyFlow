@@ -229,17 +229,28 @@ export const merchantCategories = pgTable(
 
 // ============ Income ============
 
-export const incomeSources = pgTable("income_sources", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  labelCt: bytea("label_ct").notNull(),
-  amountCents: cents("amount_cents").notNull(), // take-home per occurrence
-  frequency: text("frequency").notNull(), // weekly | biweekly | semimonthly | monthly | annually
-  anchorDate: date("anchor_date").notNull(),
-  endDate: date("end_date"),
-});
+export const incomeSources = pgTable(
+  "income_sources",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    labelCt: bytea("label_ct").notNull(),
+    amountCents: cents("amount_cents").notNull(), // take-home per occurrence
+    frequency: text("frequency").notNull(), // weekly | biweekly | semimonthly | monthly | annually
+    anchorDate: date("anchor_date").notNull(),
+    endDate: date("end_date"),
+    /**
+     * "manual": entered by the user; income is projected from the schedule.
+     * "detected": found in bank deposits; past income uses the actual deposits.
+     */
+    origin: text("origin").notNull().default("manual"),
+    /** The payer's blind index, for sources found in (or confirmed from) deposits. */
+    merchantHash: bytea("merchant_hash"),
+  },
+  (t) => [unique("income_sources_user_payer_unique").on(t.userId, t.merchantHash)],
+);
 
 export const incomeEntries = pgTable("income_entries", {
   id: uuid("id").primaryKey().defaultRandom(),

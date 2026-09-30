@@ -2,6 +2,7 @@ import { and, count, desc, eq, gte, isNull, lt, sql, sum } from "drizzle-orm";
 import type { UserCrypto } from "@/lib/crypto/userCrypto";
 import type { Tx } from "@/lib/db/core";
 import { accounts, categories, incomeEntries, incomeSources, transactions } from "@/lib/db/schema";
+import { detectedDepositsByMonth } from "@/lib/income/suggest";
 import { incomeByMonth, type IncomeFrequency } from "./income";
 import { formatMonth, monthRange, shiftMonth, type Month } from "./spend";
 
@@ -51,18 +52,25 @@ export async function spendByMonth(tx: Tx, from: string, to: string): Promise<Ma
   return new Map(rows.map((r) => [r.key, r.cents]));
 }
 
-/** Income per "YYYY-MM" from recurring sources and one-off entries. */
+/**
+ * Income per "YYYY-MM": income the user entered is projected from its schedule, one-off
+ * entries count on their date, and income detected from bank deposits counts the deposits
+ * that actually arrived.
+ */
 export async function loadIncomeByMonth(tx: Tx, from: string, to: string) {
-  const [sources, entries] = await Promise.all([
-    tx.select().from(incomeSources),
+  const [sources, entries, deposits] = await Promise.all([
+    tx.select().from(incomeSources).where(eq(incomeSources.origin, "manual")),
     tx.select().from(incomeEntries).where(and(gte(incomeEntries.receivedOn, from), lt(incomeEntries.receivedOn, to))),
+    detectedDepositsByMonth(tx, from, to),
   ]);
-  return incomeByMonth(
+  const totals = incomeByMonth(
     sources.map((s) => ({ ...s, frequency: s.frequency as IncomeFrequency })),
     entries,
     from,
     to,
   );
+  for (const [month, cents] of deposits) totals.set(month, (totals.get(month) ?? 0) + cents);
+  return totals;
 }
 
 export async function spendByCategory(tx: Tx, from: string, to: string) {

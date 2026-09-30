@@ -85,6 +85,13 @@
       "when": 1790798911758,
       "tag": "0011_savings_goals_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1790808375284,
+      "tag": "0012_detected_income",
+      "breakpoints": true
     }
   ]
 }

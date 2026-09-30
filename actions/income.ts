@@ -12,7 +12,7 @@ import { allow } from "@/lib/guard";
 import { toCents } from "@/lib/money";
 import { RateLimitError } from "@/lib/rate-limit";
 import { INCOME_FREQUENCIES } from "@/lib/reports/income";
-import { dismissIncomeSuggestion } from "@/lib/income/suggest";
+import { dismissPayer } from "@/lib/income/suggest";
 import { loadUserContext } from "@/lib/user";
 
 export type IncomeActionResult = { ok: true } | { ok: false; error: string };
@@ -63,7 +63,11 @@ export async function saveIncomeSource(input: z.input<typeof SourceInput>): Prom
       endDate: v.endDate || null,
     };
     if (v.id) {
-      const updated = await tx.update(incomeSources).set(values).where(eq(incomeSources.id, v.id)).returning();
+      const updated = await tx
+        .update(incomeSources)
+        .set({ ...values, origin: "manual" })
+        .where(eq(incomeSources.id, v.id))
+        .returning();
       return updated.length > 0;
     }
     await tx.insert(incomeSources).values({ userId, ...values });
@@ -76,7 +80,7 @@ export async function saveIncomeSource(input: z.input<typeof SourceInput>): Prom
 
 export async function deleteIncomeSource(id: string): Promise<IncomeActionResult> {
   const userId = await requireUser();
-  await withUser(userId, (tx) => tx.delete(incomeSources).where(eq(incomeSources.id, z.uuid().parse(id))));
+  await removeSource(userId, z.uuid().parse(id));
   refresh();
   return { ok: true };
 }
@@ -113,11 +117,18 @@ export async function deleteIncomeEntry(id: string): Promise<IncomeActionResult>
   return { ok: true };
 }
 
-/** "Not income": stop suggesting this payer. */
-export async function dismissIncomeSuggestionAction(key: string): Promise<IncomeActionResult> {
-  const userId = await requireUser();
-  const k = z.string().regex(/^[0-9a-f]{64}$/).parse(key);
-  await withUser(userId, async (tx) => dismissIncomeSuggestion(tx, (await loadUserContext(tx, userId)).crypto, k));
-  refresh();
-  return { ok: true };
+/**
+ * Deleting income that was detected from deposits also stops detecting that payer;
+ * otherwise it would come straight back on the next sync.
+ */
+async function removeSource(userId: string, id: string) {
+  await withUser(userId, async (tx) => {
+    const [source] = await tx.select().from(incomeSources).where(eq(incomeSources.id, id));
+    if (!source) return;
+    if (source.origin === "detected" && source.merchantHash) {
+      await dismissPayer(tx, (await loadUserContext(tx, userId)).crypto, source.merchantHash);
+    } else {
+      await tx.delete(incomeSources).where(eq(incomeSources.id, id));
+    }
+  });
 }

@@ -3,13 +3,7 @@
 import { useState, useTransition, type ReactElement } from "react";
 import { MoreHorizontalIcon, PencilIcon, PlusIcon, RepeatIcon, Trash2Icon, WalletIcon } from "lucide-react";
 import { toast } from "sonner";
-import {
-  deleteIncomeEntry,
-  deleteIncomeSource,
-  dismissIncomeSuggestionAction,
-  saveIncomeEntry,
-  saveIncomeSource,
-} from "@/actions/income";
+import { deleteIncomeEntry, deleteIncomeSource, saveIncomeEntry, saveIncomeSource } from "@/actions/income";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -289,7 +283,7 @@ export function IncomeRowMenu({
   function remove() {
     startTransition(async () => {
       await (kind === "source" ? deleteIncomeSource(id) : deleteIncomeEntry(id));
-      toast.success(`Deleted ${name}`);
+      toast.success(source?.detected ? `${name} won't be counted as income` : `Deleted ${name}`);
     });
   }
 
@@ -303,10 +297,10 @@ export function IncomeRowMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={() => setEditing(true)}>
-            <PencilIcon /> Edit
+            <PencilIcon /> {source?.detected ? "Edit (stops auto-updates)" : "Edit"}
           </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={remove}>
-            <Trash2Icon /> Delete
+            <Trash2Icon /> {source?.detected ? "Not income" : "Delete"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -316,35 +310,5 @@ export function IncomeRowMenu({
         <IncomeEntryDialog entry={entry} open={editing} onOpenChange={setEditing} today={today} />
       )}
     </>
-  );
-}
-
-/** "Add" and "Not income" for a paycheck found in a linked bank account. */
-export function IncomeSuggestionActions({
-  suggestionKey,
-  prefill,
-  today,
-}: {
-  suggestionKey: string;
-  prefill: IncomePrefill;
-  today: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
-  return (
-    <div className="flex shrink-0 items-center gap-1">
-      <Button size="sm" onClick={() => setOpen(true)}>
-        <PlusIcon /> Add
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        disabled={pending}
-        onClick={() => startTransition(async () => void (await dismissIncomeSuggestionAction(suggestionKey)))}
-      >
-        Not income
-      </Button>
-      {open && <IncomeSourceDialog prefill={prefill} open={open} onOpenChange={setOpen} today={today} />}
-    </div>
   );
 }

@@ -3,6 +3,7 @@ import { evaluateBudgetAlerts, loadBudgets } from "@/lib/budgets";
 import { createClaudeCategorizer } from "@/lib/categorize/llm";
 import { reclassifyCardPayments } from "@/lib/categorize/payments";
 import { refreshSubscriptions } from "@/lib/subscriptions";
+import { syncDetectedIncome } from "@/lib/income/suggest";
 import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { categorizeUncategorized, type CategorizeResult } from "@/lib/categorize/pipeline";
 import { getKeyProvider } from "@/lib/crypto/keyProvider";
@@ -24,6 +25,7 @@ export function refreshUser(userId: string, opts: { itemIds?: string[] } = {}) {
     const synced = await syncUser(userId, opts);
     await fixCardPayments(userId);
     const categorized = await categorizeForUser(userId);
+    await detectIncome(userId);
     await checkBudgets(userId);
     await detectSubscriptions(userId);
     return { synced, categorized };
@@ -123,5 +125,17 @@ export async function detectSubscriptions(userId: string) {
     });
   } catch (err) {
     console.error("subscription detection failed", { error: (err as Error).message });
+  }
+}
+
+/** Adds or updates income found in bank deposits (runs after categorization, so transfers are excluded). */
+export async function detectIncome(userId: string) {
+  try {
+    await withUser(userId, async (tx) => {
+      const today = todayIn(await loadTimezone(tx, userId));
+      await syncDetectedIncome(tx, await loadUserCrypto(tx, getKeyProvider(), userId), today.iso);
+    });
+  } catch (err) {
+    console.error("income detection failed", { error: (err as Error).message });
   }
 }

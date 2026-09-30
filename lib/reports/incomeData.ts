@@ -2,7 +2,7 @@ import { desc, gte } from "drizzle-orm";
 import type { UserCrypto } from "@/lib/crypto/userCrypto";
 import type { Tx } from "@/lib/db/core";
 import { incomeEntries, incomeSources } from "@/lib/db/schema";
-import { loadIncomeSuggestions, type IncomeSuggestion } from "@/lib/income/suggest";
+import { payerBanks } from "@/lib/income/suggest";
 import { addYears } from "@/lib/time";
 import { FREQUENCY_LABEL, occurrences, PER_MONTH, type IncomeFrequency } from "./income";
 
@@ -16,14 +16,16 @@ export type IncomeSourceView = {
   endDate: string | null;
   monthlyCents: number;
   nextPayDate: string | null;
+  /** Found in bank deposits (kept up to date automatically) rather than entered by hand. */
+  detected: boolean;
+  /** For detected income, the bank the pay lands in. */
+  bank: string | null;
 };
 export type IncomeEntryView = { id: string; label: string; amountCents: number; receivedOn: string };
 export type IncomeData = {
   sources: IncomeSourceView[];
   entries: IncomeEntryView[];
   monthlyRecurringCents: number;
-  /** Regular deposits in linked bank accounts that look like pay. */
-  suggestions: IncomeSuggestion[];
 };
 
 /** `today` is "YYYY-MM-DD" in the user's timezone. */
@@ -38,6 +40,10 @@ export async function loadIncome(tx: Tx, crypto: UserCrypto, today: string): Pro
   ]);
 
   const horizon = addYears(today, 1);
+  const banks = await payerBanks(
+    tx,
+    sourceRows.filter((s) => s.origin === "detected" && s.merchantHash).map((s) => s.merchantHash!),
+  );
   const sources = sourceRows
     .map((s) => {
       const frequency = s.frequency as IncomeFrequency;
@@ -52,6 +58,8 @@ export async function loadIncome(tx: Tx, crypto: UserCrypto, today: string): Pro
         endDate: s.endDate,
         monthlyCents: active ? Math.round(s.amountCents * PER_MONTH[frequency]) : 0,
         nextPayDate: occurrences({ ...s, frequency }, today, horizon)[0] ?? null,
+        detected: s.origin === "detected",
+        bank: s.merchantHash ? banks.get(s.merchantHash.toString("hex")) ?? null : null,
       };
     })
     .sort((a, b) => b.monthlyCents - a.monthlyCents);
@@ -65,6 +73,5 @@ export async function loadIncome(tx: Tx, crypto: UserCrypto, today: string): Pro
       receivedOn: e.receivedOn,
     })),
     monthlyRecurringCents: sources.reduce((a, s) => a + s.monthlyCents, 0),
-    suggestions: await loadIncomeSuggestions(tx, crypto, today, sources.filter((s) => s.monthlyCents > 0)),
   };
 }
