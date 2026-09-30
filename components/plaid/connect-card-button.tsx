@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { PlusIcon } from "lucide-react";
+import { toast } from "sonner";
 import { usePlaidLink, type PlaidLinkOnSuccessMetadata } from "react-plaid-link";
 import { createLinkToken, exchangePublicToken, markReconnected } from "@/actions/plaid";
 import { Button } from "@/components/ui/button";
@@ -40,6 +42,7 @@ export function ConnectCardButton({
               })
             : { ok: false as const, error: "Plaid didn't return a connection. Please try again." };
         if (!result.ok) setError(result.error);
+        else toast.success(itemId ? "Reconnected" : "Card connected", { description: "Importing your transactions now." });
         router.refresh();
       });
     },
@@ -65,6 +68,7 @@ export function ConnectCardButton({
           });
         }}
       >
+        {!itemId && <PlusIcon />}
         {pending ? "Working…" : label}
       </Button>
       {error && <p className="text-sm text-destructive">{error}</p>}

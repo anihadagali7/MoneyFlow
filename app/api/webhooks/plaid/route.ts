@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { after } from "next/server";
-import { findItemOwner, recordWebhookEvent, withUser } from "@/lib/db";
+import { findItemOwner, markWebhookProcessed, recordWebhookEvent, withUser } from "@/lib/db";
 import { plaidItems } from "@/lib/db/schema";
 import { refreshUser } from "@/lib/jobs";
 import { getPlaid } from "@/lib/plaid/client";
@@ -32,17 +32,25 @@ export async function POST(req: Request) {
   if (!verified) return new Response("Invalid signature", { status: 401 });
 
   const body = JSON.parse(rawBody) as PlaidWebhook;
-  const isNew = await recordWebhookEvent({
+  const eventId = await recordWebhookEvent({
     source: "plaid",
     bodySha256: createHash("sha256").update(rawBody).digest(),
     plaidItemId: body.item_id,
     webhookType: body.webhook_type,
     webhookCode: body.webhook_code,
   });
-  if (!isNew || !body.item_id) return new Response(null, { status: 200 });
+  if (!eventId) return new Response(null, { status: 200 }); // duplicate delivery
+  const done = () => markWebhookProcessed(eventId);
+  if (!body.item_id) {
+    await done();
+    return new Response(null, { status: 200 });
+  }
 
   const userId = await findItemOwner(body.item_id);
-  if (!userId) return new Response(null, { status: 200 });
+  if (!userId) {
+    await done();
+    return new Response(null, { status: 200 });
+  }
   const plaidItemId = body.item_id;
 
   const code = body.webhook_code ?? "";
@@ -52,6 +60,7 @@ export async function POST(req: Request) {
         tx.select({ id: plaidItems.id }).from(plaidItems).where(eq(plaidItems.plaidItemId, plaidItemId)),
       );
       if (item) await refreshUser(userId, { itemIds: [item.id] });
+      await done();
     });
   } else if (body.webhook_type === "ITEM") {
     const errorCode = body.error?.error_code;
@@ -65,6 +74,9 @@ export async function POST(req: Request) {
           .where(eq(plaidItems.plaidItemId, plaidItemId)),
       );
     }
+    await done();
+  } else {
+    await done();
   }
 
   return new Response(null, { status: 200 });
