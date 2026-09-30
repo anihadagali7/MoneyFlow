@@ -1,11 +1,11 @@
-import { eq, like } from "drizzle-orm";
+import { eq, inArray, like } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { reclassifyCardPayments } from "@/lib/categorize/payments";
 import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { runAsUser, type Db } from "@/lib/db/core";
 import { accounts, categories, incomeSources, transactions } from "@/lib/db/schema";
 import { syncItem, type SyncPage } from "@/lib/plaid/sync";
-import { dismissPayer, syncDetectedIncome } from "@/lib/income/suggest";
+import { addPayerAsIncome, dismissPayer, listPayCandidates, syncDetectedIncome } from "@/lib/income/suggest";
 import { loadIncome } from "@/lib/reports/incomeData";
 import { loadIncomeByMonth, spendByMonth } from "@/lib/reports/summary";
 import { loadItems } from "@/lib/views/data";
@@ -179,6 +179,40 @@ describe("checking accounts", () => {
         .where(like(transactions.plaidTransactionId, "pay-%"));
     });
     expect(await early("2026-09-20")).toBe(1);
+  });
+
+  it("lists pay the automatic check missed, says why, and adds it on request", async () => {
+    // Two of the four paychecks are much bigger (overtime), so the amounts look irregular.
+    await runAsUser(db, U, (tx) =>
+      tx
+        .update(transactions)
+        .set({ amountCents: -4100_00 })
+        .where(inArray(transactions.plaidTransactionId, ["pay-2026-08-14", "pay-2026-08-28"])),
+    );
+    const withCrypto = <T>(
+      fn: (
+        tx: Parameters<Parameters<typeof runAsUser>[2]>[0],
+        c: Awaited<ReturnType<typeof loadUserCrypto>>,
+      ) => Promise<T>,
+    ) => runAsUser(db, U, async (tx) => fn(tx, await loadUserCrypto(tx, provider, U)));
+    expect(await withCrypto((tx, c) => syncDetectedIncome(tx, c, "2026-09-20"))).toBe(0);
+
+    const [candidate, ...rest] = await withCrypto((tx, c) => listPayCandidates(tx, c, "2026-09-20"));
+    expect(rest).toEqual([]);
+    expect(candidate).toMatchObject({
+      name: "Acme Corp",
+      count: 4,
+      frequency: "biweekly",
+      reason: "Amounts vary too much from one deposit to the next",
+    });
+
+    expect(await withCrypto((tx, c) => addPayerAsIncome(tx, c, candidate.key, "2026-09-20"))).toBe(true);
+    const [source] = await runAsUser(db, U, (tx) => tx.select().from(incomeSources));
+    expect(source).toMatchObject({ origin: "detected", frequency: "biweekly", amountCents: 2861_54, endDate: null });
+    // Reports count what actually arrived, overtime included.
+    const income = await runAsUser(db, U, (tx) => loadIncomeByMonth(tx, "2026-08-01", "2026-10-01"));
+    expect(Object.fromEntries(income)).toEqual({ "2026-08": 2 * 4100_00, "2026-09": 2861_54 });
+    expect(await withCrypto((tx, c) => listPayCandidates(tx, c, "2026-09-20"))).toEqual([]);
   });
 
   it("doesn't duplicate income the user already entered by hand", async () => {

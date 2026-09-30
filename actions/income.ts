@@ -12,7 +12,7 @@ import { allow } from "@/lib/guard";
 import { toCents } from "@/lib/money";
 import { RateLimitError } from "@/lib/rate-limit";
 import { INCOME_FREQUENCIES } from "@/lib/reports/income";
-import { dismissPayer } from "@/lib/income/suggest";
+import { addPayerAsIncome, dismissPayer } from "@/lib/income/suggest";
 import { loadUserContext } from "@/lib/user";
 
 export type IncomeActionResult = { ok: true } | { ok: false; error: string };
@@ -33,7 +33,10 @@ const SourceInput = z
     anchorDate: isoDate,
     endDate: isoDate.optional().or(z.literal("")),
   })
-  .refine((v) => !v.endDate || v.endDate >= v.anchorDate, { message: "End date must be after the first pay date", path: ["endDate"] });
+  .refine((v) => !v.endDate || v.endDate >= v.anchorDate, {
+    message: "End date must be after the first pay date",
+    path: ["endDate"],
+  });
 
 const EntryInput = z.object({ id: z.uuid().optional(), label, amount, receivedOn: isoDate });
 
@@ -74,6 +77,24 @@ export async function saveIncomeSource(input: z.input<typeof SourceInput>): Prom
     return true;
   });
   if (!found) return { ok: false, error: "Income source not found" };
+  refresh();
+  return { ok: true };
+}
+
+/** Adds a payer from "Deposits that look like pay" as income. */
+export async function addPayCandidate(key: string): Promise<IncomeActionResult> {
+  const userId = await requireUser();
+  if (!(await allow(userId, "income.save"))) return { ok: false, error: new RateLimitError().message };
+  const payer = z
+    .string()
+    .regex(/^[0-9a-f]{16,128}$/)
+    .safeParse(key);
+  if (!payer.success) return { ok: false, error: "Deposit not found" };
+  const added = await withUser(userId, async (tx) => {
+    const { crypto, today } = await loadUserContext(tx, userId);
+    return addPayerAsIncome(tx, crypto, payer.data, today.iso);
+  });
+  if (!added) return { ok: false, error: "Deposit not found" };
   refresh();
   return { ok: true };
 }

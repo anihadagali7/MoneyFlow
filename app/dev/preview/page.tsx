@@ -116,7 +116,34 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     income: { href: "/income", node: <IncomeView data={f.income} today={f.today} /> },
     "income-empty": {
       href: "/income",
-      node: <IncomeView data={{ sources: [], entries: [], monthlyRecurringCents: 0 }} today={f.today} />,
+      node: <IncomeView
+          data={{
+            sources: [],
+            entries: [],
+            monthlyRecurringCents: 0,
+            candidates: [
+              {
+                key: "a1",
+                name: "FORD MOTOR COMPA PAYROLLDD PPD ID: 1380549190",
+                count: 14,
+                typicalCents: 2411_04,
+                lastDate: "2026-09-25",
+                frequency: "biweekly",
+                reason: "Some deposits are off schedule (gaps or extra payments)",
+              },
+              {
+                key: "b2",
+                name: "Venmo",
+                count: 3,
+                typicalCents: 60_00,
+                lastDate: "2026-09-02",
+                frequency: "monthly",
+                reason: "Not on a regular schedule",
+              },
+            ],
+          }}
+          today={f.today}
+        />,
     },
     accounts: { href: "/accounts", node: <AccountsView items={f.items} now={f.now} /> },
     "import-done": {

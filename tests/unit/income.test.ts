@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { explainDeposits } from "@/lib/income/detect";
 import { incomeByMonth, occurrences, type IncomeSourceInput } from "@/lib/reports/income";
 
 const src = (o: Partial<IncomeSourceInput>): IncomeSourceInput => ({
@@ -95,5 +96,23 @@ describe("detectPaycheck", () => {
     // Biweekly dates that happen to sit near two days of the month are still biweekly.
     const lookalike = ["2026-07-31", "2026-08-14", "2026-08-28", "2026-09-11"].map((date) => ({ date, amountCents: 2861_54 }));
     expect(detectPaycheck(lookalike)?.frequency).toBe("biweekly");
+  });
+});
+
+describe("explainDeposits", () => {
+  const dep = (date: string, amountCents = 2400_00) => ({ date, amountCents });
+
+  it("says when there are too few paychecks to see a schedule", () => {
+    expect(explainDeposits([dep("2026-09-11"), dep("2026-08-28"), dep("2026-08-14")])).toEqual({
+      frequency: "biweekly",
+      reason: "3 deposits so far; 4 needed to spot a schedule",
+    });
+  });
+
+  it("says when deposits skip around", () => {
+    const dates = ["2026-01-02", "2026-01-16", "2026-03-27", "2026-04-10", "2026-06-19", "2026-07-03"];
+    expect(explainDeposits(dates.map((d) => dep(d))).reason).toBe(
+      "Some deposits are off schedule (gaps or extra payments)",
+    );
   });
 });

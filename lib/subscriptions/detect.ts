@@ -32,7 +32,7 @@ const DAY = 86_400_000;
 const utc = (d: string) => Date.parse(`${d}T00:00:00Z`);
 const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
-function median(values: number[]): number {
+export function median(values: number[]): number {
   const s = [...values].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);
   return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);

@@ -4,7 +4,8 @@ import type { Tx } from "@/lib/db/core";
 import { accounts, categories, incomeSources, plaidItems, tags, transactions } from "@/lib/db/schema";
 import type { IncomeFrequency } from "@/lib/reports/income";
 import { shiftDays } from "@/lib/trips/detect";
-import { detectPaycheck } from "./detect";
+import { median } from "@/lib/subscriptions/detect";
+import { detectPaycheck, explainDeposits } from "./detect";
 
 const DISMISSED = "income_dismissed"; // tags row; name_ct holds the payer's blind-index key
 const ACTIVE_DAYS = 45; // a paycheck not seen for ~6 weeks has stopped
@@ -35,7 +36,20 @@ type Payer = {
   lastDate: string;
 };
 
-async function detectPayers(tx: Tx, crypto: UserCrypto, today: string, labelledOnly: boolean): Promise<Payer[]> {
+type DepositGroup = {
+  hash: Buffer;
+  key: string;
+  name: string;
+  deposits: Array<{ date: string; amountCents: number }>; // positive amounts, newest first
+};
+
+/** Deposits from the last ~13 months, grouped by payer. */
+async function depositGroups(
+  tx: Tx,
+  crypto: UserCrypto,
+  today: string,
+  labelledOnly: boolean,
+): Promise<DepositGroup[]> {
   const rows = await tx
     .select({
       merchantHash: transactions.merchantHash,
@@ -55,24 +69,102 @@ async function detectPayers(tx: Tx, crypto: UserCrypto, today: string, labelledO
     const key = r.merchantHash!.toString("hex");
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
-  const payers: Payer[] = [];
-  for (const [key, deposits] of groups) {
-    const pattern = detectPaycheck(deposits.map((d) => ({ date: d.date, amountCents: -d.amountCents })));
-    if (!pattern) continue;
-    const latest = deposits[0]; // newest first
-    payers.push({
+  return [...groups].map(([key, deposits]) => {
+    const latest = deposits[0];
+    return {
       hash: latest.merchantHash!,
       key,
       name:
         crypto.decryptOrNull("transactions", "merchant_name_ct", latest.merchantNameCt) ??
         crypto.decrypt("transactions", "description_ct", latest.descriptionCt),
+      deposits: deposits.map((d) => ({ date: d.date, amountCents: -d.amountCents })),
+    };
+  });
+}
+
+async function detectPayers(tx: Tx, crypto: UserCrypto, today: string, labelledOnly: boolean): Promise<Payer[]> {
+  const payers: Payer[] = [];
+  for (const g of await depositGroups(tx, crypto, today, labelledOnly)) {
+    const pattern = detectPaycheck(g.deposits);
+    if (!pattern) continue;
+    payers.push({
+      hash: g.hash,
+      key: g.key,
+      name: g.name,
       frequency: pattern.frequency,
       amountCents: pattern.amountCents,
-      firstDate: deposits[deposits.length - 1].date,
+      firstDate: g.deposits[g.deposits.length - 1].date,
       lastDate: pattern.lastDate,
     });
   }
   return payers;
+}
+
+export type PayCandidate = {
+  key: string;
+  name: string;
+  count: number;
+  typicalCents: number;
+  lastDate: string;
+  frequency: IncomeFrequency;
+  /** Why it wasn't added automatically. */
+  reason: string;
+};
+
+/**
+ * Repeated deposits that aren't income yet, biggest first, with the reason detection
+ * passed on them, so the user can add pay the automatic check missed.
+ */
+export async function listPayCandidates(tx: Tx, crypto: UserCrypto, today: string, limit = 5): Promise<PayCandidate[]> {
+  const [groups, sources, dismissedRows] = await Promise.all([
+    depositGroups(tx, crypto, today, false),
+    tx.select({ hash: incomeSources.merchantHash }).from(incomeSources),
+    tx.select({ nameCt: tags.nameCt }).from(tags).where(eq(tags.kind, DISMISSED)),
+  ]);
+  const taken = new Set(sources.filter((s) => s.hash).map((s) => s.hash!.toString("hex")));
+  for (const r of dismissedRows) taken.add(crypto.decrypt("tags", "name_ct", r.nameCt));
+  const total = (g: DepositGroup) => g.deposits.reduce((a, d) => a + d.amountCents, 0);
+  return (
+    groups
+      // Pay that fits a schedule is added (or already covered) by syncDetectedIncome.
+      .filter((g) => !taken.has(g.key) && g.deposits.length >= 2 && !detectPaycheck(g.deposits))
+      .sort((a, b) => total(b) - total(a))
+      .slice(0, limit)
+      .map((g) => ({
+        key: g.key,
+        name: g.name,
+        count: g.deposits.length,
+        typicalCents: median(g.deposits.map((d) => d.amountCents)),
+        lastDate: g.deposits[0].date,
+        ...explainDeposits(g.deposits),
+      }))
+  );
+}
+
+/**
+ * Adds a payer as income by hand. It's stored like detected income, so reports count the
+ * actual deposits, and it keeps following the deposits if they later fit a schedule.
+ */
+export async function addPayerAsIncome(tx: Tx, crypto: UserCrypto, key: string, today: string): Promise<boolean> {
+  const group = (await depositGroups(tx, crypto, today, false)).find((g) => g.key === key);
+  if (!group) return false;
+  const pattern = detectPaycheck(group.deposits);
+  const latest = group.deposits[0];
+  const active = latest.date >= shiftDays(today, -ACTIVE_DAYS);
+  await tx
+    .insert(incomeSources)
+    .values({
+      userId: crypto.userId,
+      labelCt: crypto.encrypt("income_sources", "label_ct", group.name),
+      amountCents: latest.amountCents,
+      frequency: pattern?.frequency ?? explainDeposits(group.deposits).frequency,
+      anchorDate: latest.date,
+      endDate: active ? null : latest.date,
+      origin: "detected",
+      merchantHash: group.hash,
+    })
+    .onConflictDoNothing();
+  return true;
 }
 
 /**
@@ -196,12 +288,10 @@ export async function payerBanks(tx: Tx, hashes: Buffer[]): Promise<Map<string, 
 
 /** "Not income": stop detecting this payer and remove its detected source. */
 export async function dismissPayer(tx: Tx, crypto: UserCrypto, hash: Buffer) {
-  await tx
-    .insert(tags)
-    .values({
-      userId: crypto.userId,
-      kind: DISMISSED,
-      nameCt: crypto.encrypt("tags", "name_ct", hash.toString("hex")),
-    });
+  await tx.insert(tags).values({
+    userId: crypto.userId,
+    kind: DISMISSED,
+    nameCt: crypto.encrypt("tags", "name_ct", hash.toString("hex")),
+  });
   await tx.delete(incomeSources).where(and(eq(incomeSources.merchantHash, hash), eq(incomeSources.origin, "detected")));
 }

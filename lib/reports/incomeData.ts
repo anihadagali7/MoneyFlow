@@ -2,7 +2,7 @@ import { desc, gte } from "drizzle-orm";
 import type { UserCrypto } from "@/lib/crypto/userCrypto";
 import type { Tx } from "@/lib/db/core";
 import { incomeEntries, incomeSources } from "@/lib/db/schema";
-import { payerBanks } from "@/lib/income/suggest";
+import { payerBanks, type PayCandidate } from "@/lib/income/suggest";
 import { addYears } from "@/lib/time";
 import { FREQUENCY_LABEL, occurrences, PER_MONTH, type IncomeFrequency } from "./income";
 
@@ -26,6 +26,8 @@ export type IncomeData = {
   sources: IncomeSourceView[];
   entries: IncomeEntryView[];
   monthlyRecurringCents: number;
+  /** Repeated deposits that aren't income yet (see listPayCandidates). */
+  candidates?: PayCandidate[];
 };
 
 /** `today` is "YYYY-MM-DD" in the user's timezone. */
@@ -59,7 +61,7 @@ export async function loadIncome(tx: Tx, crypto: UserCrypto, today: string): Pro
         monthlyCents: active ? Math.round(s.amountCents * PER_MONTH[frequency]) : 0,
         nextPayDate: occurrences({ ...s, frequency }, today, horizon)[0] ?? null,
         detected: s.origin === "detected",
-        bank: s.merchantHash ? banks.get(s.merchantHash.toString("hex")) ?? null : null,
+        bank: s.merchantHash ? (banks.get(s.merchantHash.toString("hex")) ?? null) : null,
       };
     })
     .sort((a, b) => b.monthlyCents - a.monthlyCents);

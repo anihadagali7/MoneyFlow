@@ -1,6 +1,7 @@
 import { CalendarIcon, LandmarkIcon, WalletIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { AddIncomeButton, IncomeRowMenu } from "@/components/income/income-dialogs";
+import { PayCandidates } from "@/components/income/pay-candidates";
 import { PageHeader } from "@/components/page-header";
 import { StatTile } from "@/components/stat-tile";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,7 @@ export function IncomeView({ data, today }: { data: IncomeData; today: string })
     return (
       <>
         <PageHeader title="Income" description="What comes in, so MoneyFlow can show your net each month." />
+        <PayCandidates candidates={data.candidates ?? []} className="mb-4" />
         <Card>
           <EmptyState
             icon={WalletIcon}
@@ -55,6 +57,8 @@ export function IncomeView({ data, today }: { data: IncomeData; today: string })
           hint={`${data.entries.length} payment${data.entries.length === 1 ? "" : "s"}`}
         />
       </div>
+
+      <PayCandidates candidates={data.candidates ?? []} className="mt-4" />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card>
