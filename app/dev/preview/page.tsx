@@ -55,7 +55,9 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     income: { href: "/income", node: <IncomeView data={f.income} today={f.today} /> },
     "income-empty": {
       href: "/income",
-      node: <IncomeView data={{ sources: [], entries: [], monthlyRecurringCents: 0, suggestions: [] }} today={f.today} />,
+      node: (
+        <IncomeView data={{ sources: [], entries: [], monthlyRecurringCents: 0, suggestions: [] }} today={f.today} />
+      ),
     },
     accounts: { href: "/accounts", node: <AccountsView items={f.items} now={f.now} /> },
     settings: {
@@ -65,6 +67,14 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
           now={f.now}
           data={{
             timezone: "America/New_York",
+            customCategories: [
+              { id: "c1", name: "Dog", countsAsSpend: true, transactionCount: 14 },
+              { id: "c2", name: "Work – reimbursable", countsAsSpend: false, transactionCount: 3 },
+            ],
+            categoryOptions: [
+              { id: "c1", name: "Dog" },
+              { id: "o1", name: "Other" },
+            ],
             activity: [
               { id: 3, action: "rule.create", createdAt: "2026-09-30T07:00:00Z" },
               { id: 2, action: "item.link", createdAt: "2026-09-29T12:10:00Z" },

@@ -26,20 +26,33 @@ export function TransactionsView({ data, today }: { data: TransactionsData; toda
         title="Transactions"
         description={
           <>
-            {data.rows.length} transaction{data.rows.length === 1 ? "" : "s"} · {formatCents(data.totals.outCents)} spent
+            {data.searching && "All months · "}
+            {data.rows.length}
+            {data.truncated && "+"} transaction{data.rows.length === 1 ? "" : "s"} · {formatCents(data.totals.outCents)}{" "}
+            spent
             {data.totals.inCents > 0 && ` · ${formatCents(data.totals.inCents)} refunds & credits`}
           </>
         }
         actions={
-          <div className="flex items-center gap-1">
-            <Link href={monthHref(data.prevMonthKey)} className={buttonVariants({ variant: "outline", size: "icon" })} aria-label="Previous month">
-              <ChevronLeftIcon />
-            </Link>
-            <span className="min-w-36 text-center text-sm font-medium">{data.monthName}</span>
-            <Link href={monthHref(data.nextMonthKey)} className={buttonVariants({ variant: "outline", size: "icon" })} aria-label="Next month">
-              <ChevronRightIcon />
-            </Link>
-          </div>
+          data.searching ? undefined : (
+            <div className="flex items-center gap-1">
+              <Link
+                href={monthHref(data.prevMonthKey)}
+                className={buttonVariants({ variant: "outline", size: "icon" })}
+                aria-label="Previous month"
+              >
+                <ChevronLeftIcon />
+              </Link>
+              <span className="min-w-36 text-center text-sm font-medium">{data.monthName}</span>
+              <Link
+                href={monthHref(data.nextMonthKey)}
+                className={buttonVariants({ variant: "outline", size: "icon" })}
+                aria-label="Next month"
+              >
+                <ChevronRightIcon />
+              </Link>
+            </div>
+          )
         }
       />
 
@@ -52,7 +65,13 @@ export function TransactionsView({ data, today }: { data: TransactionsData; toda
           <EmptyState
             icon={SearchXIcon}
             title={hasFilters ? "No matching transactions" : "No transactions this month"}
-            description={hasFilters ? "Try a different search or clear the filters." : "Pick another month, or sync your cards from Overview."}
+            description={
+              data.searching
+                ? "Nothing in the last 2 years matches. Try part of the name, or an exact amount like 15.49."
+                : hasFilters
+                  ? "Try different filters or clear them."
+                  : "Pick another month, or sync your cards from Overview."
+            }
             action={
               hasFilters ? (
                 <Link href={`/transactions?month=${data.monthKey}`} className={buttonVariants({ variant: "outline" })}>

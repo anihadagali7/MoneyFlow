@@ -57,3 +57,17 @@ describe("groupByDate", () => {
     ]);
   });
 });
+
+describe("matchesSearch", () => {
+  it("matches names, descriptors and exact amounts", async () => {
+    const { matchesSearch } = await import("@/lib/views/data");
+    const r = { merchant: "Netflix", description: "NETFLIX.COM 866-579", amountCents: 15_49 };
+    expect(matchesSearch(r, "netf")).toBe(true);
+    expect(matchesSearch(r, "866")).toBe(true);
+    expect(matchesSearch(r, "15.49")).toBe(true);
+    expect(matchesSearch(r, "$15.49")).toBe(true);
+    expect(matchesSearch({ ...r, amountCents: -15_49 }, "15.49")).toBe(true); // refunds too
+    expect(matchesSearch(r, "15.50")).toBe(false);
+    expect(matchesSearch(r, "hulu")).toBe(false);
+  });
+});

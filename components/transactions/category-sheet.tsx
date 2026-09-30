@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckIcon } from "lucide-react";
+import { CheckIcon, PlusIcon } from "lucide-react";
+import { CategoryDialog } from "@/components/categories/category-dialog";
 import { toast } from "sonner";
 import { setCategory } from "@/actions/transactions";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -30,9 +31,10 @@ export function CategorySheetTrigger({
   const [always, setAlways] = useState(false);
   const [current, setCurrent] = useState(categoryId);
   const [pending, startTransition] = useTransition();
+  const [creating, setCreating] = useState(false);
 
-  function choose(id: string) {
-    const name = options.find((o) => o.id === id)?.name ?? "category";
+  function choose(id: string, knownName?: string) {
+    const name = knownName ?? options.find((o) => o.id === id)?.name ?? "category";
     const previous = current;
     setCurrent(id);
     startTransition(async () => {
@@ -40,7 +42,8 @@ export function CategorySheetTrigger({
         const { relabeled } = await setCategory({ transactionId, categoryId: id, applyToMerchant: always });
         setOpen(false);
         toast.success(always ? `${merchant} will always be ${name}` : `Moved to ${name}`, {
-          description: always && relabeled ? `${relabeled} other transaction${relabeled === 1 ? "" : "s"} updated` : undefined,
+          description:
+            always && relabeled ? `${relabeled} other transaction${relabeled === 1 ? "" : "s"} updated` : undefined,
         });
       } catch {
         setCurrent(previous);
@@ -74,7 +77,23 @@ export function CategorySheetTrigger({
             </span>
             <Switch checked={always} onCheckedChange={setAlways} />
           </label>
-          <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3" role="listbox" aria-label="Categories">
+          <ul
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-3"
+            role="listbox"
+            aria-label="Categories"
+          >
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setCreating(true);
+                }}
+                className="flex min-h-12 w-full items-center gap-2 rounded-lg px-3 text-left text-base font-medium active:bg-muted"
+              >
+                <PlusIcon className="size-5" /> New category
+              </button>
+            </li>
             {options.map((o) => (
               <li key={o.id}>
                 <button
@@ -96,6 +115,7 @@ export function CategorySheetTrigger({
           </ul>
         </SheetContent>
       </Sheet>
+      {creating && <CategoryDialog open={creating} onOpenChange={setCreating} onSaved={(c) => choose(c.id, c.name)} />}
     </>
   );
 }

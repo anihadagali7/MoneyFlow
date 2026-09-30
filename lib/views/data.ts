@@ -62,7 +62,10 @@ async function loadCards(tx: Tx, crypto: UserCrypto): Promise<Array<AccountSumma
 }
 
 export async function loadItems(tx: Tx, crypto: UserCrypto): Promise<ItemSummary[]> {
-  const [items, cards] = await Promise.all([tx.select().from(plaidItems).orderBy(plaidItems.createdAt), loadCards(tx, crypto)]);
+  const [items, cards] = await Promise.all([
+    tx.select().from(plaidItems).orderBy(plaidItems.createdAt),
+    loadCards(tx, crypto),
+  ]);
   return items.map((i) => ({
     id: i.id,
     institutionName: i.institutionName ?? "Card",
@@ -70,11 +73,23 @@ export async function loadItems(tx: Tx, crypto: UserCrypto): Promise<ItemSummary
     lastSyncedAt: i.lastSyncedAt?.toISOString() ?? null,
     cards: cards
       .filter((c) => c.itemId === i.id)
-      .map((c) => ({ id: c.id, label: c.label, removed: c.removed, type: c.type, subtype: c.subtype, balanceCents: c.balanceCents })),
+      .map((c) => ({
+        id: c.id,
+        label: c.label,
+        removed: c.removed,
+        type: c.type,
+        subtype: c.subtype,
+        balanceCents: c.balanceCents,
+      })),
   }));
 }
 
-export async function loadTxnRows(tx: Tx, crypto: UserCrypto, where: SQL | undefined, limit: number): Promise<TxnRow[]> {
+export async function loadTxnRows(
+  tx: Tx,
+  crypto: UserCrypto,
+  where: SQL | undefined,
+  limit: number,
+): Promise<TxnRow[]> {
   const [rows, cards] = await Promise.all([
     tx
       .select({
@@ -155,7 +170,11 @@ export async function loadDashboard(tx: Tx, crypto: UserCrypto, today: Today): P
     const incomeCents = income.get(key) ?? 0;
     return { key, label: monthLabel(m), spendCents, incomeCents, netCents: incomeCents - spendCents };
   });
-  const toTotals = (r: MonthRow): Totals => ({ spendCents: r.spendCents, incomeCents: r.incomeCents, netCents: r.netCents });
+  const toTotals = (r: MonthRow): Totals => ({
+    spendCents: r.spendCents,
+    incomeCents: r.incomeCents,
+    netCents: r.netCents,
+  });
 
   return {
     monthKey: formatMonth(current),
@@ -184,7 +203,27 @@ export type TransactionsData = {
   cards: CardRef[];
   rows: TxnRow[];
   totals: { outCents: number; inCents: number };
+  /** Searching covers all months (up to 2 years), not just the selected one. */
+  searching: boolean;
+  /** More matches exist than are shown. */
+  truncated: boolean;
 };
+
+const SEARCH_MONTHS = 24;
+const SEARCH_SCAN_LIMIT = 10_000;
+const SEARCH_RESULT_LIMIT = 500;
+
+/**
+ * Matches a transaction against a search. Text matches the merchant or bank descriptor;
+ * a number like "15.49" or "$15.49" matches that exact amount (in or out).
+ */
+export function matchesSearch(r: Pick<TxnRow, "merchant" | "description" | "amountCents">, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const amount = q.replace(/[$,\s]/g, "");
+  if (/^\d+(\.\d{1,2})?$/.test(amount) && Math.abs(r.amountCents) === Math.round(Number(amount) * 100)) return true;
+  return r.merchant.toLowerCase().includes(q) || r.description.toLowerCase().includes(q);
+}
 
 export async function loadTransactions(
   tx: Tx,
@@ -194,21 +233,29 @@ export async function loadTransactions(
 ): Promise<TransactionsData> {
   const month = parseMonth(filters.month, today.month);
   const { from, to } = monthRange(month);
-  const where: SQL[] = [gte(transactions.date, from), lt(transactions.date, to)];
+  const q = filters.q?.trim() ?? "";
+  const searching = q.length > 0;
+  // Search looks across all months; otherwise show the selected month.
+  const where: SQL[] = searching
+    ? [gte(transactions.date, monthRange(shiftMonth(today.month, -SEARCH_MONTHS)).from)]
+    : [gte(transactions.date, from), lt(transactions.date, to)];
   if (filters.review === "1") where.push(eq(transactions.needsReview, true));
   if (filters.card) where.push(eq(transactions.accountId, filters.card));
   if (filters.category === "uncategorized") where.push(isNull(transactions.categoryId));
   else if (filters.category) where.push(eq(categories.slug, filters.category));
 
   const [categoryRows, cards, rows] = await Promise.all([
-    tx.select({ id: categories.id, slug: categories.slug, name: categories.name }).from(categories).orderBy(asc(categories.name)),
+    tx
+      .select({ id: categories.id, slug: categories.slug, name: categories.name })
+      .from(categories)
+      .orderBy(asc(categories.name)),
     loadCards(tx, crypto),
-    loadTxnRows(tx, crypto, and(...where), 1000),
+    loadTxnRows(tx, crypto, and(...where), searching ? SEARCH_SCAN_LIMIT : 1000),
   ]);
 
   // Search runs after decryption; merchant names aren't stored in plaintext.
-  const q = filters.q?.trim().toLowerCase();
-  const filtered = q ? rows.filter((r) => r.merchant.toLowerCase().includes(q) || r.description.toLowerCase().includes(q)) : rows;
+  const matched = searching ? rows.filter((r) => matchesSearch(r, q)) : rows;
+  const filtered = matched.slice(0, SEARCH_RESULT_LIMIT);
 
   return {
     monthKey: formatMonth(month),
@@ -224,5 +271,7 @@ export async function loadTransactions(
       outCents: filtered.filter((r) => r.amountCents > 0 && !r.isTransfer).reduce((a, r) => a + r.amountCents, 0),
       inCents: filtered.filter((r) => r.amountCents < 0 && !r.isTransfer).reduce((a, r) => a - r.amountCents, 0),
     },
+    searching,
+    truncated: matched.length > filtered.length,
   };
 }

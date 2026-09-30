@@ -325,6 +325,8 @@ export const fixtures = {
     ],
     rows,
     totals: { outCents: 682_67, inCents: 38_99 },
+    searching: false,
+    truncated: false,
   } satisfies TransactionsData,
   reports: {
     range: "6m",

@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { ChevronRightIcon, CreditCardIcon, DownloadIcon, GlobeIcon } from "lucide-react";
+import { CategoriesManager } from "@/components/categories/categories-manager";
 import { PageHeader } from "@/components/page-header";
 import { DeleteAccountButton } from "@/components/settings/delete-account";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { CustomCategory } from "@/lib/categories";
 import { relativeTime } from "@/lib/views/dates";
 
 export type SettingsData = {
   timezone: string;
+  customCategories: CustomCategory[];
+  categoryOptions: Array<{ id: string; name: string }>;
   activity: Array<{ id: number; action: string; createdAt: string }>;
 };
 
@@ -16,6 +20,7 @@ const ACTION_LABEL: Record<string, string> = {
   "item.remove": "Disconnected a bank",
   "card.remove": "Removed a card",
   "card.restore": "Added a card back",
+  "category.delete": "Deleted a category",
   "rule.create": "Created a category rule",
   export: "Downloaded your data",
   "account.delete": "Deleted account",
@@ -38,6 +43,16 @@ export function SettingsView({ data, now }: { data: SettingsData; now: number })
             <ChevronRightIcon className="size-4 text-muted-foreground" />
           </Card>
         </Link>
+        <Card>
+          <CardHeader>
+            <CardTitle>Categories</CardTitle>
+            <CardDescription>Your own categories, alongside the built-in ones</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CategoriesManager categories={data.customCategories} options={data.categoryOptions} />
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Timezone</CardTitle>

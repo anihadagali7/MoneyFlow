@@ -54,8 +54,8 @@ export function TransactionFiltersBar({
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search merchants"
-          aria-label="Search merchants"
+          placeholder="Search all months"
+          aria-label="Search all transactions"
           className="bg-card pl-8"
         />
       </div>
