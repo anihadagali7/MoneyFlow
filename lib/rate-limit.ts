@@ -9,6 +9,7 @@ export const LIMITS = {
   "category.set": { limit: 120, windowSeconds: 60 },
   "income.save": { limit: 60, windowSeconds: 60 },
   "budget.save": { limit: 60, windowSeconds: 60 },
+  "trip.save": { limit: 60, windowSeconds: 60 },
 } as const;
 export type RateLimitedAction = keyof typeof LIMITS;
 

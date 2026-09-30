@@ -6,6 +6,7 @@ import { activeAlerts, evaluateBudgetAlerts, loadBudgets } from "@/lib/budgets";
 import { withUser } from "@/lib/db";
 import { detectSubscriptions, refreshUser, shouldRefresh } from "@/lib/jobs";
 import { loadSubscriptions } from "@/lib/subscriptions";
+import { loadTrips } from "@/lib/trips";
 import { loadUserContext } from "@/lib/user";
 import { loadDashboard } from "@/lib/views/data";
 
@@ -15,15 +16,16 @@ export const maxDuration = 60;
 
 export default async function DashboardPage() {
   const userId = await requireUser();
-  const { data, today, budgets, subscriptions, alerts } = await withUser(userId, async (tx) => {
+  const { data, today, budgets, subscriptions, trips, alerts } = await withUser(userId, async (tx) => {
     const { crypto, today } = await loadUserContext(tx, userId);
-    const [data, budgets, subscriptions] = await Promise.all([
+    const [data, budgets, subscriptions, trips] = await Promise.all([
       loadDashboard(tx, crypto, today),
       loadBudgets(tx, today),
       loadSubscriptions(tx, crypto, today),
+      loadTrips(tx, crypto, today),
     ]);
     await evaluateBudgetAlerts(tx, userId, budgets);
-    return { data, today, budgets, subscriptions, alerts: await activeAlerts(tx, budgets) };
+    return { data, today, budgets, subscriptions, trips, alerts: await activeAlerts(tx, budgets) };
   });
 
   // Webhooks keep things fresh in production; this covers missed webhooks and local dev.
@@ -38,6 +40,13 @@ export default async function DashboardPage() {
   }
 
   return (
-    <DashboardView data={data} today={today.iso} budgets={budgets} alerts={alerts} subscriptions={subscriptions} />
+    <DashboardView
+      data={data}
+      today={today.iso}
+      budgets={budgets}
+      alerts={alerts}
+      subscriptions={subscriptions}
+      tripSuggestion={trips.suggestions[0]}
+    />
   );
 }

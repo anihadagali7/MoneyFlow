@@ -1,6 +1,7 @@
 import { computeProgress, type ActiveAlert, type BudgetsData } from "@/lib/budgets";
 import type { IncomeData } from "@/lib/reports/incomeData";
 import type { SubscriptionsData, SubscriptionView } from "@/lib/subscriptions";
+import type { TripDetail, TripsData } from "@/lib/trips";
 import type { MonthRow, ReportData } from "@/lib/reports/summary";
 import type { DashboardData, ItemSummary, TransactionsData, TxnRow } from "@/lib/views/data";
 
@@ -198,7 +199,61 @@ const subscriptions: SubscriptionsData = {
   priceIncreases: [activeSubs[1]],
 };
 
+const chicago = {
+  id: "trip-1",
+  name: "Chicago long weekend",
+  startsOn: "2026-09-03",
+  endsOn: "2026-09-06",
+  days: 4,
+  totalCents: 1487_40,
+  count: 14,
+  categories: [
+    { slug: "travel_lodging", name: "Hotels & Lodging", cents: 612_00 },
+    { slug: "travel_flights", name: "Flights", cents: 418_20 },
+    { slug: "dining", name: "Restaurants & Dining", cents: 286_40 },
+    { slug: "transport_rideshare", name: "Rideshare & Taxi", cents: 96_30 },
+    { slug: "entertainment", name: "Entertainment & Events", cents: 74_50 },
+  ],
+};
+const trips: TripsData = {
+  trips: [
+    chicago,
+    {
+      id: "trip-2",
+      name: "Japan 2026",
+      startsOn: "2026-04-11",
+      endsOn: "2026-04-24",
+      days: 14,
+      totalCents: 5210_75,
+      count: 61,
+      categories: [
+        { slug: "travel_flights", name: "Flights", cents: 1840_00 },
+        { slug: "travel_lodging", name: "Hotels & Lodging", cents: 1622_10 },
+        { slug: "dining", name: "Restaurants & Dining", cents: 902_33 },
+      ],
+    },
+  ],
+  suggestions: [
+    {
+      key: "2026-08-14:boston",
+      city: "Boston",
+      startsOn: "2026-08-14",
+      endsOn: "2026-08-16",
+      transactionIds: ["a", "b", "c", "d"],
+      bookingIds: ["e"],
+      totalCents: 486_12,
+    },
+  ],
+};
+const tripDetail: TripDetail = {
+  trip: chicago,
+  rows: rows.slice(0, 6).map((r, i) => ({ ...r, date: `2026-09-0${3 + (i % 4)}`, card: "Venture X ••4821" })),
+  addable: rows.slice(6),
+};
+
 export const fixtures = {
+  trips,
+  tripDetail,
   subscriptions,
   budgets: budgetsData,
   alerts,

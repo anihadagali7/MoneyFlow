@@ -8,12 +8,14 @@ import { IncomeView } from "@/components/views/income-view";
 import { ReportsView } from "@/components/views/reports-view";
 import { SettingsView } from "@/components/views/settings-view";
 import { SubscriptionsView } from "@/components/views/subscriptions-view";
+import { TripDetailView } from "@/components/views/trip-detail-view";
+import { TripsView } from "@/components/views/trips-view";
 import { TransactionsView } from "@/components/views/transactions-view";
 import { fixtures } from "@/lib/dev/fixtures";
 
 /**
  * Development-only: renders each signed-in screen with sample data, for design review
- * without an account. 404s in production. /dev/preview?view=dashboard|transactions|budgets|subscriptions|reports|income|accounts|settings|empty
+ * without an account. 404s in production. /dev/preview?view=dashboard|transactions|budgets|subscriptions|trips|trip|reports|income|accounts|settings|empty
  */
 export default async function PreviewPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   if (process.env.NODE_ENV === "production") notFound();
@@ -30,9 +32,12 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
           budgets={f.budgets}
           alerts={f.alerts}
           subscriptions={f.subscriptions}
+          tripSuggestion={f.trips.suggestions[0]}
         />
       ),
     },
+    trips: { href: "/trips", node: <TripsView data={f.trips} today="2026-09-20" /> },
+    trip: { href: "/trips", node: <TripDetailView data={f.tripDetail} today="2026-09-20" /> },
     subscriptions: { href: "/subscriptions", node: <SubscriptionsView data={f.subscriptions} today="2026-09-20" /> },
     budgets: { href: "/budgets", node: <BudgetsView data={f.budgets} options={budgetDialogOptions(f.budgets)} /> },
     "budgets-empty": {

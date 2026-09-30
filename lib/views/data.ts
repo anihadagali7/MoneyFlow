@@ -59,7 +59,7 @@ export async function loadItems(tx: Tx, crypto: UserCrypto): Promise<ItemSummary
   }));
 }
 
-async function loadTxnRows(tx: Tx, crypto: UserCrypto, where: SQL | undefined, limit: number): Promise<TxnRow[]> {
+export async function loadTxnRows(tx: Tx, crypto: UserCrypto, where: SQL | undefined, limit: number): Promise<TxnRow[]> {
   const [rows, cards] = await Promise.all([
     tx
       .select({

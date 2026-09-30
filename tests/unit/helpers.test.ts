@@ -42,3 +42,18 @@ describe("mapPfcToSlug", () => {
     expect(mapPfcToSlug(null)).toBeNull();
   });
 });
+
+describe("groupByDate", () => {
+  it("makes one group per date, newest first, even from unsorted rows", async () => {
+    const { groupByDate } = await import("@/lib/views/dates");
+    const groups = groupByDate([
+      { date: "2026-09-03", id: 1 },
+      { date: "2026-09-04", id: 2 },
+      { date: "2026-09-03", id: 3 },
+    ]);
+    expect(groups.map((g) => [g.date, g.rows.map((r) => r.id)])).toEqual([
+      ["2026-09-04", [2]],
+      ["2026-09-03", [1, 3]],
+    ]);
+  });
+});

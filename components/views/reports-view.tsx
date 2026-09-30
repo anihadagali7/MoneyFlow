@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { formatCents } from "@/lib/money";
 import { RANGE_KEYS, type ReportData } from "@/lib/reports/summary";
 import { shortDate } from "@/lib/views/dates";
+import Link from "next/link";
+import { ChevronRightIcon, PlaneIcon, RepeatIcon } from "lucide-react";
 
 const SHORT: Record<string, string> = { "3m": "3M", "6m": "6M", "12m": "12M", ytd: "YTD" };
 
@@ -31,9 +33,27 @@ export function ReportsView({ data }: { data: ReportData }) {
         }
       />
 
+      <div className="mb-4 grid grid-cols-2 gap-3 md:hidden">
+        {[
+          { href: "/subscriptions", label: "Subscriptions", icon: RepeatIcon },
+          { href: "/trips", label: "Trips", icon: PlaneIcon },
+        ].map(({ href, label, icon: Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className="flex items-center gap-2 rounded-xl border bg-card px-3 py-3 text-sm font-medium active:bg-muted"
+          >
+            <Icon className="size-4 text-muted-foreground" />
+            <span className="flex-1">{label}</span>
+            <ChevronRightIcon className="size-4 text-muted-foreground" />
+          </Link>
+        ))}
+      </div>
+
       {data.uncategorized > 0 && (
         <p className="mb-4 text-sm text-muted-foreground">
-          {data.uncategorized} transaction{data.uncategorized === 1 ? " is" : "s are"} still being categorized and not counted yet.
+          {data.uncategorized} transaction{data.uncategorized === 1 ? " is" : "s are"} still being categorized and not
+          counted yet.
         </p>
       )}
 
@@ -44,10 +64,16 @@ export function ReportsView({ data }: { data: ReportData }) {
           delta={computeDelta(totals.spendCents, prior.spendCents, false, vs)}
           hint={`≈ ${formatCents(Math.round(totals.spendCents / monthsWithData))}/mo`}
         />
-        <StatTile label="Income" value={formatCents(totals.incomeCents)} delta={computeDelta(totals.incomeCents, prior.incomeCents, true, vs)} />
+        <StatTile
+          label="Income"
+          value={formatCents(totals.incomeCents)}
+          delta={computeDelta(totals.incomeCents, prior.incomeCents, true, vs)}
+        />
         <StatTile
           label="Net"
-          value={<span className={totals.netCents < 0 ? "text-destructive" : undefined}>{formatCents(totals.netCents)}</span>}
+          value={
+            <span className={totals.netCents < 0 ? "text-destructive" : undefined}>{formatCents(totals.netCents)}</span>
+          }
           delta={computeDelta(totals.netCents, prior.netCents, true, vs)}
         />
         <StatTile
@@ -102,7 +128,12 @@ export function ReportsView({ data }: { data: ReportData }) {
             <CardContent>
               <BarList
                 total={totals.spendCents}
-                items={data.cards.map((c) => ({ key: c.id, label: c.label, cents: c.cents, href: `/transactions?card=${c.id}` }))}
+                items={data.cards.map((c) => ({
+                  key: c.id,
+                  label: c.label,
+                  cents: c.cents,
+                  href: `/transactions?card=${c.id}`,
+                }))}
               />
             </CardContent>
           </Card>
@@ -121,7 +152,9 @@ export function ReportsView({ data }: { data: ReportData }) {
                     </span>
                   </li>
                 ))}
-                {data.merchants.length === 0 && <li className="py-4 text-center text-muted-foreground">No spending yet.</li>}
+                {data.merchants.length === 0 && (
+                  <li className="py-4 text-center text-muted-foreground">No spending yet.</li>
+                )}
               </ul>
             </CardContent>
           </Card>
@@ -146,7 +179,9 @@ export function ReportsView({ data }: { data: ReportData }) {
                 <TxnAmount cents={t.cents} className="font-medium" />
               </li>
             ))}
-            {data.largest.length === 0 && <li className="py-4 text-center text-muted-foreground">No purchases in this period.</li>}
+            {data.largest.length === 0 && (
+              <li className="py-4 text-center text-muted-foreground">No purchases in this period.</li>
+            )}
           </ul>
         </CardContent>
       </Card>

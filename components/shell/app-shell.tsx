@@ -9,6 +9,7 @@ import {
   CreditCardIcon,
   LayoutDashboardIcon,
   PiggyBankIcon,
+  PlaneIcon,
   RepeatIcon,
   SettingsIcon,
   WalletIcon,
@@ -23,6 +24,7 @@ export const NAV = [
   { href: "/transactions", label: "Transactions", icon: ArrowLeftRightIcon, mobile: true },
   { href: "/budgets", label: "Budgets", icon: PiggyBankIcon, mobile: true },
   { href: "/subscriptions", label: "Subscriptions", icon: RepeatIcon, mobile: false },
+  { href: "/trips", label: "Trips", icon: PlaneIcon, mobile: false },
   { href: "/reports", label: "Reports", icon: ChartColumnIcon, mobile: true },
   { href: "/income", label: "Income", icon: WalletIcon, mobile: true },
   // On phones, Cards lives under Settings to keep the tab bar to five.

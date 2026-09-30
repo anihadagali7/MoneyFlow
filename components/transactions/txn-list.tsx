@@ -39,12 +39,14 @@ export function TxnList({
   today,
   trailing,
   rowAction,
+  trailingOnPhones = false,
   subtitle = "card",
 }: {
   rows: TxnRow[];
   today: string;
-  /** Desktop-only control at the end of each row (hidden on phones). */
+  /** Control at the end of each row; hidden on phones unless `trailingOnPhones`. */
   trailing?: (row: TxnRow) => ReactNode;
+  trailingOnPhones?: boolean;
   /** Phone-only full-row tap target, e.g. opening a bottom sheet. */
   rowAction?: (row: TxnRow) => ReactNode;
   subtitle?: "card" | "category";
@@ -93,7 +95,7 @@ export function TxnList({
                   )}
                 </div>
                 <TxnAmount cents={r.amountCents} transfer={r.isTransfer} className="text-sm font-medium" />
-                {trailing && <div className="hidden shrink-0 sm:block">{trailing(r)}</div>}
+                {trailing && <div className={cn("shrink-0", !trailingOnPhones && "hidden sm:block")}>{trailing(r)}</div>}
                 {rowAction?.(r)}
               </li>
             ))}

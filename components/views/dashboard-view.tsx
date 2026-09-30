@@ -14,6 +14,9 @@ import { EmptyState } from "@/components/empty-state";
 import { formatCents } from "@/lib/money";
 import type { ActiveAlert, BudgetsData } from "@/lib/budgets";
 import type { SubscriptionsData } from "@/lib/subscriptions";
+import type { SuggestedTrip } from "@/lib/trips/detect";
+import { SuggestionActions } from "@/components/trips/trip-controls";
+import { PlaneIcon } from "lucide-react";
 import { shortDate } from "@/lib/views/dates";
 import type { DashboardData } from "@/lib/views/data";
 
@@ -23,12 +26,14 @@ export function DashboardView({
   budgets,
   alerts = [],
   subscriptions,
+  tripSuggestion,
 }: {
   data: DashboardData;
   today: string;
   budgets?: BudgetsData;
   alerts?: ActiveAlert[];
   subscriptions?: SubscriptionsData;
+  tripSuggestion?: SuggestedTrip;
 }) {
   if (data.items.length === 0) {
     return (
@@ -59,6 +64,15 @@ export function DashboardView({
 
       <div className="mb-4 flex flex-col gap-2 empty:hidden">
         <BudgetAlerts alerts={alerts} />
+        {tripSuggestion && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-card px-4 py-3 text-sm">
+            <PlaneIcon className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1">
+              Looks like you were in <span className="font-medium">{tripSuggestion.city}</span>. Track it as a trip?
+            </span>
+            <SuggestionActions suggestion={tripSuggestion} />
+          </div>
+        )}
         {needsReconnect.map((item) => (
           <div
             key={item.id}

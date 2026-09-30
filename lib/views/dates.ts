@@ -21,14 +21,11 @@ export function shortDate(date: string): string {
   return new Date(utc(date)).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
+/** One group per date, newest first, whatever order the rows arrive in. */
 export function groupByDate<T extends { date: string }>(rows: T[]): Array<{ date: string; rows: T[] }> {
-  const groups: Array<{ date: string; rows: T[] }> = [];
-  for (const r of rows) {
-    const last = groups.at(-1);
-    if (last && last.date === r.date) last.rows.push(r);
-    else groups.push({ date: r.date, rows: [r] });
-  }
-  return groups;
+  const groups = new Map<string, T[]>();
+  for (const r of rows) groups.set(r.date, [...(groups.get(r.date) ?? []), r]);
+  return [...groups].map(([date, rows]) => ({ date, rows })).sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export function relativeTime(iso: string, now: number): string {
