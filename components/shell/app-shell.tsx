@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { ArrowLeftRightIcon, ChartColumnIcon, CreditCardIcon, LayoutDashboardIcon, WalletIcon } from "lucide-react";
+import { ArrowLeftRightIcon, ChartColumnIcon, CreditCardIcon, LayoutDashboardIcon, SettingsIcon, WalletIcon } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
@@ -15,6 +16,19 @@ export const NAV = [
   { href: "/income", label: "Income", icon: WalletIcon },
   { href: "/accounts", label: "Cards", icon: CreditCardIcon },
 ] as const;
+
+function SettingsLink({ active }: { active: boolean }) {
+  return (
+    <Link
+      href="/settings"
+      aria-label="Settings"
+      aria-current={active ? "page" : undefined}
+      className={cn(buttonVariants({ variant: "ghost", size: "icon" }), active && "bg-muted")}
+    >
+      <SettingsIcon />
+    </Link>
+  );
+}
 
 /**
  * Signed-in layout: a sidebar on desktop, a top bar plus bottom tab bar on phones.
@@ -49,7 +63,10 @@ export function AppShell({ children, user, activeHref }: { children: ReactNode; 
         </nav>
         <div className="mt-auto flex items-center justify-between gap-2 border-t px-1 pt-4">
           {user}
-          <ThemeToggle />
+          <div className="flex items-center">
+            <SettingsLink active={isActive("/settings")} />
+            <ThemeToggle />
+          </div>
         </div>
       </aside>
 
@@ -58,9 +75,10 @@ export function AppShell({ children, user, activeHref }: { children: ReactNode; 
           <Link href="/dashboard">
             <Logo />
           </Link>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             <ThemeToggle />
-            {user}
+            <SettingsLink active={isActive("/settings")} />
+            <span className="ml-1.5 flex">{user}</span>
           </div>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-[max(1rem,env(safe-area-inset-left))] pt-5 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:px-8 md:pt-10 md:pb-12">

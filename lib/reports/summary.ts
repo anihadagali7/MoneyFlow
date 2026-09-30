@@ -17,8 +17,7 @@ export const RANGE_LABEL: Record<RangeKey, string> = {
 export type ReportRange = { key: RangeKey; months: Month[]; from: string; to: string; priorFrom: string };
 
 /** "Last N months" includes the current (partial) month. The prior period is the N months before. */
-export function resolveRange(key: RangeKey, today = new Date()): ReportRange {
-  const current: Month = { year: today.getFullYear(), month: today.getMonth() + 1 };
+export function resolveRange(key: RangeKey, current: Month): ReportRange {
   const n = key === "ytd" ? current.month : Number.parseInt(key, 10);
   const months = Array.from({ length: n }, (_, i) => shiftMonth(current, i - n + 1));
   return {

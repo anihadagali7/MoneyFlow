@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { encryptField, fieldAad } from "@/lib/crypto/envelope";
 import { LocalKeyProvider } from "@/lib/crypto/keyProvider";
 import { createUserKeyMaterial, getUserKeys } from "@/lib/crypto/userKeys";
-import { findItemOwner, runAsUser, type Db } from "@/lib/db/core";
+import { findItemOwner, listItemsForSweep, runAsUser, type Db } from "@/lib/db/core";
 import * as s from "@/lib/db/schema";
 import { createTestDb } from "../helpers/testDb";
 
@@ -24,6 +24,7 @@ const USER_TABLES = {
   income_sources: s.incomeSources,
   income_entries: s.incomeEntries,
   audit_log: s.auditLog,
+  rate_limits: s.rateLimits,
 } as const;
 
 const provider = new LocalKeyProvider(randomBytes(32));
@@ -95,6 +96,7 @@ async function seedUser(userId: string) {
       receivedOn: "2026-09-10",
     });
     await tx.insert(s.auditLog).values({ userId, action: "test.seed" });
+    await tx.insert(s.rateLimits).values({ userId, action: "sync", windowStart: new Date(), count: 1 });
     ids[userId] = { itemId: item.id, plaidItemId, txnId: txn.id, categoryId: category.id };
   });
 }
@@ -211,6 +213,21 @@ describe("tenant isolation", () => {
     });
     expect(leaked[0].map((r) => r.userId)).toEqual([B]);
     expect(leaked[1]).toHaveLength(0);
+  });
+
+  it("the cron sweep can list Items across users but read nothing else or write", async () => {
+    const due = await listItemsForSweep(db, new Date(Date.now() + 60_000));
+    expect(due.map((d) => d.userId).sort()).toEqual([A, B]);
+    const leaked = await db.transaction(async (tx) => {
+      await tx.execute(sql`select set_config('app.cron_sweep', 'on', true)`);
+      const txns = await tx.select().from(s.transactions);
+      const updated = await tx.update(s.plaidItems).set({ status: "revoked" }).returning();
+      return { txns: txns.length, updated: updated.length };
+    });
+    expect(leaked).toEqual({ txns: 0, updated: 0 });
+    // And the setting doesn't outlive its transaction.
+    const { rows } = await raw.query<{ n: number }>("select count(*)::int as n from plaid_items");
+    expect(rows[0].n).toBe(0);
   });
 
   it("deleting a user cascades their data and leaves other users intact", async () => {

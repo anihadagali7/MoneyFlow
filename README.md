@@ -4,7 +4,8 @@ Private, AI-categorized credit card expense tracking. Connect cards through Plai
 have every transaction categorized automatically, and track spend, income and net
 per month. The full design is in [PLAN.md](PLAN.md).
 
-**Status:** Phase 1: connect cards with Plaid (Sandbox), transaction sync with
+**Status:** Phase 2: income, reports, iPhone home-screen app, settings (export, disconnect,
+delete account), daily catch-up sync, rate limits and a strict Content-Security-Policy. Built on Phase 1: connect cards with Plaid (Sandbox), transaction sync with
 pending→posted handling, AI categorization with Claude Haiku 4.5, merchant rules,
 a transactions page, and a monthly spend dashboard.
 
@@ -47,6 +48,14 @@ Requires Node.js 20.19+ (22 LTS recommended) and a Postgres 15+ database.
 | `npm run db:studio` | Browse the database |
 | `npm run smoke` | Checks Plaid Sandbox + Anthropic keys against the real APIs (no database) |
 
+## Deploying (Vercel)
+
+- Run migrations against the production database **before** pushing code that needs them:
+  `DATABASE_URL="<direct connection string>" npm run db:migrate`
+- `CRON_SECRET` must be set in Vercel for the daily catch-up sync (`vercel.json`); Vercel sends
+  it to `/api/cron/sync` automatically.
+- `PLAID_WEBHOOK_URL` must point at the production domain (`/api/webhooks/plaid`).
+
 ## How data stays private
 
 - **Row-Level Security:** every user-owned table has a *forced* RLS policy on
@@ -59,8 +68,10 @@ Requires Node.js 20.19+ (22 LTS recommended) and a Postgres 15+ database.
   `LOCAL_MASTER_KEY`). Plaid tokens, merchant names, descriptions, account names,
   notes and labels are AES-256-GCM encrypted, bound to their table, column and
   owner. Amounts, dates and categories stay queryable for reports.
-- **Deletion:** deleting a user deletes their wrapped keys, so any ciphertext left in
-  backups becomes unreadable.
+- **Deletion:** Settings → Delete account revokes every bank at Plaid and deletes the user,
+  including their wrapped keys, so any ciphertext left in backups becomes unreadable.
+- **Browser:** a per-request nonce Content-Security-Policy (`proxy.ts`), HSTS, no framing.
+  Sensitive actions are rate limited in Postgres (`lib/rate-limit.ts`) and recorded in the audit log.
 
 ## Project layout
 

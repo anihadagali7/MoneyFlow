@@ -2,6 +2,7 @@ import "server-only";
 import { getDb } from "./client";
 import {
   findItemOwner as findItemOwnerIn,
+  listItemsForSweep as listItemsForSweepIn,
   markWebhookProcessed as markWebhookProcessedIn,
   recordWebhookEvent as recordWebhookEventIn,
   runAsUser,
@@ -24,4 +25,8 @@ export function recordWebhookEvent(event: Parameters<typeof recordWebhookEventIn
 
 export function markWebhookProcessed(id: string): Promise<void> {
   return markWebhookProcessedIn(getDb(), id);
+}
+
+export function listItemsForSweep(olderThan: Date) {
+  return listItemsForSweepIn(getDb(), olderThan);
 }

@@ -1,10 +1,7 @@
 import type { NextRequest } from "next/server";
 import { verifyWebhook } from "@clerk/nextjs/webhooks";
-import { eq } from "drizzle-orm";
+import { deleteUserData } from "@/lib/account";
 import { forgetProvisionedUser } from "@/lib/auth";
-import { evictCachedKeys } from "@/lib/crypto/userKeys";
-import { withUser } from "@/lib/db";
-import { auditLog, users } from "@/lib/db/schema";
 
 /**
  * Clerk → MoneyFlow. Signature-verified with CLERK_WEBHOOK_SIGNING_SECRET.
@@ -19,16 +16,9 @@ export async function POST(req: NextRequest) {
   }
 
   if (evt.type === "user.deleted" && evt.data.id) {
-    const userId = evt.data.id;
-    // Deleting the row removes the wrapped keys, which makes any ciphertext left in
-    // backups unreadable (crypto-shredding). Child rows cascade.
-    // TODO(phase 2): call Plaid /item/remove for each Item before deleting.
-    await withUser(userId, async (tx) => {
-      await tx.insert(auditLog).values({ userId, action: "account.delete", meta: { via: "clerk" } });
-      await tx.delete(users).where(eq(users.id, userId));
-    });
-    evictCachedKeys(userId);
-    forgetProvisionedUser(userId);
+    // Covers accounts deleted from Clerk's dashboard; a no-op if the app already did it.
+    await deleteUserData(evt.data.id, "clerk");
+    forgetProvisionedUser(evt.data.id);
   }
 
   return new Response(null, { status: 204 });

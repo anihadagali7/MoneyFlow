@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
-// Baseline security headers. A nonce-based Content-Security-Policy is added in
-// Phase 1 alongside Plaid Link, which needs cdn.plaid.com allowlisted.
+// Baseline security headers. The Content-Security-Policy is set per request in proxy.ts
+// because it carries a fresh nonce.
 const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   { key: "X-Content-Type-Options", value: "nosniff" },

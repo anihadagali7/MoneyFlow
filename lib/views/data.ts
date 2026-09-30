@@ -2,7 +2,8 @@ import { and, asc, count, desc, eq, gte, isNull, lt, type SQL } from "drizzle-or
 import type { UserCrypto } from "@/lib/crypto/userCrypto";
 import type { Tx } from "@/lib/db/core";
 import { accounts, categories, plaidItems, transactions } from "@/lib/db/schema";
-import { formatMonth, monthRange, parseMonth, shiftMonth, type Month } from "@/lib/reports/spend";
+import { formatMonth, monthRange, parseMonth, shiftMonth } from "@/lib/reports/spend";
+import type { Today } from "@/lib/time";
 import {
   loadIncomeByMonth,
   monthLabel,
@@ -112,8 +113,8 @@ export type DashboardData = {
   items: ItemSummary[];
 };
 
-export async function loadDashboard(tx: Tx, crypto: UserCrypto, today = new Date()): Promise<DashboardData> {
-  const current: Month = { year: today.getFullYear(), month: today.getMonth() + 1 };
+export async function loadDashboard(tx: Tx, crypto: UserCrypto, today: Today): Promise<DashboardData> {
+  const current = today.month;
   const trendMonths = Array.from({ length: 6 }, (_, i) => shiftMonth(current, i - 5));
   const trendFrom = monthRange(trendMonths[0]).from;
   const { from, to } = monthRange(current);
@@ -165,8 +166,13 @@ export type TransactionsData = {
   totals: { outCents: number; inCents: number };
 };
 
-export async function loadTransactions(tx: Tx, crypto: UserCrypto, filters: TransactionFilters): Promise<TransactionsData> {
-  const month = parseMonth(filters.month);
+export async function loadTransactions(
+  tx: Tx,
+  crypto: UserCrypto,
+  filters: TransactionFilters,
+  today: Today,
+): Promise<TransactionsData> {
+  const month = parseMonth(filters.month, today.month);
   const { from, to } = monthRange(month);
   const where: SQL[] = [gte(transactions.date, from), lt(transactions.date, to)];
   if (filters.review === "1") where.push(eq(transactions.needsReview, true));

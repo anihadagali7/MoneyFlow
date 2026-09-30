@@ -66,3 +66,20 @@ describe("incomeByMonth", () => {
     expect(Object.fromEntries(totals)).toEqual({ "2026-01": 6500_00, "2026-02": 4000_00 });
   });
 });
+
+describe("todayIn", () => {
+  it("uses the user's timezone, not the server's", async () => {
+    const { todayIn } = await import("@/lib/time");
+    // 9:30pm in New York on Sep 30 is already Oct 1 in UTC.
+    const evening = new Date("2026-10-01T01:30:00Z");
+    expect(todayIn("America/New_York", evening)).toEqual({ iso: "2026-09-30", month: { year: 2026, month: 9 } });
+    expect(todayIn("UTC", evening).iso).toBe("2026-10-01");
+    expect(todayIn("Not/AZone", evening).iso).toBe("2026-09-30"); // falls back to the default
+  });
+
+  it("adds years, clamping leap days", async () => {
+    const { addYears } = await import("@/lib/time");
+    expect(addYears("2028-02-29", 1)).toBe("2029-02-28");
+    expect(addYears("2026-09-30", -1)).toBe("2025-09-30");
+  });
+});

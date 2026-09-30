@@ -6,10 +6,10 @@ export function monthRange({ year, month }: Month) {
   return { from: `${year}-${pad(month)}-01`, to: `${next.year}-${pad(next.month)}-01` };
 }
 
-export function parseMonth(value: string | undefined, fallback: Date = new Date()): Month {
+export function parseMonth(value: string | undefined, fallback: Month): Month {
   const m = value?.match(/^(\d{4})-(\d{2})$/);
   if (m && +m[2] >= 1 && +m[2] <= 12) return { year: +m[1], month: +m[2] };
-  return { year: fallback.getFullYear(), month: fallback.getMonth() + 1 };
+  return fallback;
 }
 
 export function shiftMonth({ year, month }: Month, delta: number): Month {

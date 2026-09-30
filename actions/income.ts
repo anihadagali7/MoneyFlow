@@ -8,7 +8,9 @@ import { getKeyProvider } from "@/lib/crypto/keyProvider";
 import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { withUser } from "@/lib/db";
 import { incomeEntries, incomeSources } from "@/lib/db/schema";
+import { allow } from "@/lib/guard";
 import { toCents } from "@/lib/money";
+import { RateLimitError } from "@/lib/rate-limit";
 import { INCOME_FREQUENCIES } from "@/lib/reports/income";
 
 export type IncomeActionResult = { ok: true } | { ok: false; error: string };
@@ -45,6 +47,7 @@ function refresh() {
 
 export async function saveIncomeSource(input: z.input<typeof SourceInput>): Promise<IncomeActionResult> {
   const userId = await requireUser();
+  if (!(await allow(userId, "income.save"))) return { ok: false, error: new RateLimitError().message };
   const parsed = SourceInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
   const v = parsed.data;
@@ -78,6 +81,7 @@ export async function deleteIncomeSource(id: string): Promise<IncomeActionResult
 
 export async function saveIncomeEntry(input: z.input<typeof EntryInput>): Promise<IncomeActionResult> {
   const userId = await requireUser();
+  if (!(await allow(userId, "income.save"))) return { ok: false, error: new RateLimitError().message };
   const parsed = EntryInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
   const v = parsed.data;

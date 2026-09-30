@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import * as schema from "./schema";
 
@@ -54,4 +54,25 @@ export async function recordWebhookEvent(
 
 export async function markWebhookProcessed(db: Db, id: string) {
   await db.update(schema.webhookEvents).set({ processedAt: new Date() }).where(eq(schema.webhookEvents.id, id));
+}
+
+/**
+ * Items due for the daily catch-up sync, across all users. Only for the cron route,
+ * which verifies CRON_SECRET first. The `plaid_items_cron_sweep` policy allows reading
+ * plaid_items (and nothing else) while app.cron_sweep is on.
+ */
+export async function listItemsForSweep(db: Db, olderThan: Date): Promise<Array<{ id: string; userId: string }>> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('app.cron_sweep', 'on', true)`);
+    return tx
+      .select({ id: schema.plaidItems.id, userId: schema.plaidItems.userId })
+      .from(schema.plaidItems)
+      .where(
+        and(
+          eq(schema.plaidItems.status, "active"),
+          or(isNull(schema.plaidItems.lastSyncedAt), lt(schema.plaidItems.lastSyncedAt, olderThan)),
+        ),
+      )
+      .orderBy(schema.plaidItems.lastSyncedAt);
+  });
 }

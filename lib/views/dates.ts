@@ -41,12 +41,6 @@ export function relativeTime(iso: string, now: number): string {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
-/** Today's date as "YYYY-MM-DD" (server time). */
-export function todayIso(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 export function nowMs(): number {
   return Date.now();
 }

@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { CountryCode, CreditAccountSubtype, Products } from "plaid";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
+import { allow } from "@/lib/guard";
+import { RateLimitError } from "@/lib/rate-limit";
 import { getKeyProvider } from "@/lib/crypto/keyProvider";
 import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { withUser } from "@/lib/db";
@@ -29,6 +31,7 @@ type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: s
 /** Creates a Plaid Link token. Pass itemId to reconnect an existing Item (update mode). */
 export async function createLinkToken(itemId?: string): Promise<ActionResult<string>> {
   const userId = await requireUser();
+  if (!(await allow(userId, "plaid.link"))) return { ok: false, error: new RateLimitError().message };
   let accessToken: string | undefined;
   if (itemId) {
     accessToken = await withUser(userId, async (tx) => {
@@ -105,6 +108,7 @@ export async function exchangePublicToken(input: z.infer<typeof ExchangeInput>):
 /** Pulls the latest transactions for all of the user's cards now; categorizes in the background. */
 export async function syncNow(): Promise<ActionResult> {
   const userId = await requireUser();
+  if (!(await allow(userId, "sync"))) return { ok: false, error: new RateLimitError().message };
   await syncUser(userId);
   after(() => categorizeForUser(userId));
   revalidatePath("/dashboard");

@@ -4,12 +4,13 @@ import { AccountsView } from "@/components/views/accounts-view";
 import { DashboardView } from "@/components/views/dashboard-view";
 import { IncomeView } from "@/components/views/income-view";
 import { ReportsView } from "@/components/views/reports-view";
+import { SettingsView } from "@/components/views/settings-view";
 import { TransactionsView } from "@/components/views/transactions-view";
 import { fixtures } from "@/lib/dev/fixtures";
 
 /**
  * Development-only: renders each signed-in screen with sample data, for design review
- * without an account. 404s in production. /dev/preview?view=dashboard|transactions|reports|income|accounts|empty
+ * without an account. 404s in production. /dev/preview?view=dashboard|transactions|reports|income|accounts|settings|empty
  */
 export default async function PreviewPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   if (process.env.NODE_ENV === "production") notFound();
@@ -24,6 +25,21 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     income: { href: "/income", node: <IncomeView data={f.income} today={f.today} /> },
     "income-empty": { href: "/income", node: <IncomeView data={{ sources: [], entries: [], monthlyRecurringCents: 0 }} today={f.today} /> },
     accounts: { href: "/accounts", node: <AccountsView items={f.items} now={f.now} /> },
+    settings: {
+      href: "/settings",
+      node: (
+        <SettingsView
+          now={f.now}
+          data={{
+            timezone: "America/New_York",
+            activity: [
+              { id: 3, action: "rule.create", createdAt: "2026-09-30T07:00:00Z" },
+              { id: 2, action: "item.link", createdAt: "2026-09-29T12:10:00Z" },
+            ],
+          }}
+        />
+      ),
+    },
   };
   const screen = screens[view] ?? screens.dashboard;
 

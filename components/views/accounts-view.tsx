@@ -2,6 +2,7 @@ import { AlertTriangleIcon, CheckCircle2Icon, CreditCardIcon, LockIcon } from "l
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { ConnectCardButton } from "@/components/plaid/connect-card-button";
+import { DisconnectButton } from "@/components/settings/disconnect-button";
 import { SyncButton } from "@/components/sync-button";
 import { Card } from "@/components/ui/card";
 import { relativeTime } from "@/lib/views/dates";
@@ -67,7 +68,14 @@ export function AccountsView({ items, now }: { items: ItemSummary[]; now: number
                     ))}
                   </ul>
                 )}
-                {!status.ok && item.status !== "revoked" && <ConnectCardButton itemId={item.id} label="Reconnect" variant="outline" />}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {!status.ok && item.status !== "revoked" ? (
+                    <ConnectCardButton itemId={item.id} label="Reconnect" variant="outline" />
+                  ) : (
+                    <span />
+                  )}
+                  <DisconnectButton itemId={item.id} name={item.institutionName} />
+                </div>
               </Card>
             );
           })}

@@ -59,17 +59,17 @@ afterEach(() => close());
 
 describe("resolveRange", () => {
   it("includes the current month and computes the prior period", () => {
-    const r = resolveRange("3m", new Date(2026, 8, 30));
+    const r = resolveRange("3m", { year: 2026, month: 9 });
     expect(r.months.map((m) => `${m.year}-${m.month}`)).toEqual(["2026-7", "2026-8", "2026-9"]);
     expect(r).toMatchObject({ from: "2026-07-01", to: "2026-10-01", priorFrom: "2026-04-01" });
-    expect(resolveRange("ytd", new Date(2026, 1, 10)).months).toHaveLength(2);
+    expect(resolveRange("ytd", { year: 2026, month: 2 }).months).toHaveLength(2);
   });
 });
 
 describe("loadReport", () => {
   it("nets refunds, excludes payments and pending, and adds income", async () => {
     const report = await runAsUser(db, U, async (tx) =>
-      loadReport(tx, await loadUserCrypto(tx, provider, U), resolveRange("3m", new Date(2026, 8, 30))),
+      loadReport(tx, await loadUserCrypto(tx, provider, U), resolveRange("3m", { year: 2026, month: 9 })),
     );
     const sep = report.months.find((m) => m.key === "2026-09")!;
     const aug = report.months.find((m) => m.key === "2026-08")!;
@@ -90,7 +90,7 @@ describe("loadReport", () => {
 
 describe("loadIncome", () => {
   it("decrypts labels and projects the next pay date and monthly amount", async () => {
-    const data = await runAsUser(db, U, async (tx) => loadIncome(tx, await loadUserCrypto(tx, provider, U), new Date("2026-09-20T12:00:00Z")));
+    const data = await runAsUser(db, U, async (tx) => loadIncome(tx, await loadUserCrypto(tx, provider, U), "2026-09-20"));
     expect(data.sources[0]).toMatchObject({ label: "Salary", nextPayDate: "2026-10-02", monthlyCents: Math.round(2000_00 * (26 / 12)) });
     expect(data.entries).toEqual([expect.objectContaining({ label: "Bonus", amountCents: 500_00 })]);
   });
