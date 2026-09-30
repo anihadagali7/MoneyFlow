@@ -10,15 +10,18 @@ const DISMISSED = "income_dismissed"; // tags row; name_ct holds the payer's bli
 const ACTIVE_DAYS = 45; // a paycheck not seen for ~6 weeks has stopped
 const LOOKBACK_DAYS = 400;
 
-/** Deposits into checking/savings that could be pay: money in, not a transfer or card payment. */
-function depositFilter(since: string) {
+/**
+ * Deposits into checking/savings that could be pay: money in, not a transfer or card payment.
+ * `labelledOnly` skips deposits the categorizer hasn't seen yet (they might be transfers).
+ */
+function depositFilter(since: string, labelledOnly = false) {
   return and(
     eq(accounts.type, "depository"),
     lt(transactions.amountCents, 0),
     eq(transactions.pending, false),
     isNotNull(transactions.merchantHash),
     gte(transactions.date, since),
-    or(isNull(categories.kind), eq(categories.kind, "income")),
+    labelledOnly ? eq(categories.kind, "income") : or(isNull(categories.kind), eq(categories.kind, "income")),
   );
 }
 
@@ -28,10 +31,11 @@ type Payer = {
   name: string;
   frequency: IncomeFrequency;
   amountCents: number;
+  firstDate: string;
   lastDate: string;
 };
 
-async function detectPayers(tx: Tx, crypto: UserCrypto, today: string): Promise<Payer[]> {
+async function detectPayers(tx: Tx, crypto: UserCrypto, today: string, labelledOnly: boolean): Promise<Payer[]> {
   const rows = await tx
     .select({
       merchantHash: transactions.merchantHash,
@@ -43,7 +47,7 @@ async function detectPayers(tx: Tx, crypto: UserCrypto, today: string): Promise<
     .from(transactions)
     .innerJoin(accounts, eq(accounts.id, transactions.accountId))
     .leftJoin(categories, eq(categories.id, transactions.categoryId))
-    .where(depositFilter(shiftDays(today, -LOOKBACK_DAYS)))
+    .where(depositFilter(shiftDays(today, -LOOKBACK_DAYS), labelledOnly))
     .orderBy(desc(transactions.date));
 
   const groups = new Map<string, typeof rows>();
@@ -64,6 +68,7 @@ async function detectPayers(tx: Tx, crypto: UserCrypto, today: string): Promise<
         crypto.decrypt("transactions", "description_ct", latest.descriptionCt),
       frequency: pattern.frequency,
       amountCents: pattern.amountCents,
+      firstDate: deposits[deposits.length - 1].date,
       lastDate: pattern.lastDate,
     });
   }
@@ -72,15 +77,22 @@ async function detectPayers(tx: Tx, crypto: UserCrypto, today: string): Promise<
 
 /**
  * Keeps income sources in step with regular deposits that look like pay:
- * - a new payer becomes a "detected" income source automatically;
+ * - a new payer becomes a "detected" income source automatically, including pay that has
+ *   since stopped (e.g. found in imported history), so past months count it;
  * - an existing detected source follows the latest amount and schedule;
  * - one whose deposits stopped gets an end date (so it stops projecting);
  * - payers the user dismissed, or already covered by income they entered, are left alone.
- * Returns how many sources were created.
+ * With `labelledOnly` (before the categorizer has run) it only adds pay already labelled
+ * as income and leaves existing sources as they are. Returns how many sources were created.
  */
-export async function syncDetectedIncome(tx: Tx, crypto: UserCrypto, today: string): Promise<number> {
+export async function syncDetectedIncome(
+  tx: Tx,
+  crypto: UserCrypto,
+  today: string,
+  { labelledOnly = false }: { labelledOnly?: boolean } = {},
+): Promise<number> {
   const [payers, sources, dismissedRows] = await Promise.all([
-    detectPayers(tx, crypto, today),
+    detectPayers(tx, crypto, today, labelledOnly),
     tx.select().from(incomeSources),
     tx.select({ nameCt: tags.nameCt }).from(tags).where(eq(tags.kind, DISMISSED)),
   ]);
@@ -95,7 +107,7 @@ export async function syncDetectedIncome(tx: Tx, crypto: UserCrypto, today: stri
     const existing = byHash.get(p.key);
     if (existing) {
       // The user edited it (now manual): leave it alone.
-      if (existing.origin !== "detected") continue;
+      if (existing.origin !== "detected" || labelledOnly) continue;
       await tx
         .update(incomeSources)
         .set({
@@ -108,12 +120,14 @@ export async function syncDetectedIncome(tx: Tx, crypto: UserCrypto, today: stri
         .where(eq(incomeSources.id, existing.id));
       continue;
     }
-    if (!active) continue;
-    // Income the user already entered by hand for this pay (same schedule, amount within 10%).
+    // Income the user already entered by hand for this pay: same schedule, amount within
+    // 10%, and running during the time these deposits came in.
+    const until = active ? today : p.lastDate;
     const covered = manual.some(
       (s) =>
         s.frequency === p.frequency &&
-        (!s.endDate || s.endDate >= today) &&
+        s.anchorDate <= until &&
+        (!s.endDate || s.endDate >= p.firstDate) &&
         Math.abs(s.amountCents - p.amountCents) <= p.amountCents * 0.1,
     );
     if (covered) continue;
@@ -123,6 +137,7 @@ export async function syncDetectedIncome(tx: Tx, crypto: UserCrypto, today: stri
       amountCents: p.amountCents,
       frequency: p.frequency,
       anchorDate: p.lastDate,
+      endDate: active ? null : p.lastDate,
       origin: "detected",
       merchantHash: p.hash,
     });
@@ -181,6 +196,12 @@ export async function payerBanks(tx: Tx, hashes: Buffer[]): Promise<Map<string, 
 
 /** "Not income": stop detecting this payer and remove its detected source. */
 export async function dismissPayer(tx: Tx, crypto: UserCrypto, hash: Buffer) {
-  await tx.insert(tags).values({ userId: crypto.userId, kind: DISMISSED, nameCt: crypto.encrypt("tags", "name_ct", hash.toString("hex")) });
+  await tx
+    .insert(tags)
+    .values({
+      userId: crypto.userId,
+      kind: DISMISSED,
+      nameCt: crypto.encrypt("tags", "name_ct", hash.toString("hex")),
+    });
   await tx.delete(incomeSources).where(and(eq(incomeSources.merchantHash, hash), eq(incomeSources.origin, "detected")));
 }

@@ -4,6 +4,7 @@ import { createClaudeCategorizer } from "@/lib/categorize/llm";
 import { reclassifyCardPayments } from "@/lib/categorize/payments";
 import { refreshSubscriptions } from "@/lib/subscriptions";
 import { syncDetectedIncome } from "@/lib/income/suggest";
+import { removeImportedDuplicates } from "@/lib/import/dedupe";
 import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { categorizeUncategorized, type CategorizeResult } from "@/lib/categorize/pipeline";
 import { getKeyProvider } from "@/lib/crypto/keyProvider";
@@ -23,13 +24,22 @@ const run: RunAsUser = (userId, fn) => withUser(userId, fn);
 export function refreshUser(userId: string, opts: { itemIds?: string[] } = {}) {
   return oncePerUser(inFlightRefresh, userId, async () => {
     const synced = await syncUser(userId, opts);
-    await fixCardPayments(userId);
-    const categorized = await categorizeForUser(userId);
-    await detectIncome(userId);
-    await checkBudgets(userId);
-    await detectSubscriptions(userId);
+    await removeDuplicateImports(userId);
+    const categorized = await processUser(userId);
     return { synced, categorized };
   });
+}
+
+/** Everything that follows new transactions: labels, income, budgets, subscriptions. */
+export async function processUser(userId: string) {
+  await fixCardPayments(userId);
+  // Pay that's already labelled first, so a long categorizer run can't hold it up.
+  await detectIncome(userId, { labelledOnly: true });
+  const categorized = await categorizeForUser(userId);
+  await detectIncome(userId);
+  await checkBudgets(userId);
+  await detectSubscriptions(userId);
+  return categorized;
 }
 
 // Page loads and webhooks can trigger overlapping refreshes; within one server
@@ -95,6 +105,16 @@ export function shouldRefresh(
   return stale || uncategorized > 0;
 }
 
+/** Drops imported rows the bank connection has since delivered itself. */
+export async function removeDuplicateImports(userId: string) {
+  try {
+    const removed = await withUser(userId, removeImportedDuplicates);
+    if (removed > 0) console.info("removed imported duplicates", { removed });
+  } catch (err) {
+    console.error("duplicate import cleanup failed", { error: (err as Error).message });
+  }
+}
+
 /** Records any budget that newly crossed 80% or 100% this month (shown as alerts on Overview). */
 export async function checkBudgets(userId: string) {
   try {
@@ -110,7 +130,9 @@ export async function checkBudgets(userId: string) {
 /** Makes sure card payments (including ones labeled before this rule existed) never count as spending. */
 export async function fixCardPayments(userId: string) {
   try {
-    await withUser(userId, async (tx) => reclassifyCardPayments(tx, await loadUserCrypto(tx, getKeyProvider(), userId)));
+    await withUser(userId, async (tx) =>
+      reclassifyCardPayments(tx, await loadUserCrypto(tx, getKeyProvider(), userId)),
+    );
   } catch (err) {
     console.error("card payment check failed", { error: (err as Error).message });
   }
@@ -128,12 +150,15 @@ export async function detectSubscriptions(userId: string) {
   }
 }
 
-/** Adds or updates income found in bank deposits (runs after categorization, so transfers are excluded). */
-export async function detectIncome(userId: string) {
+/**
+ * Adds or updates income found in bank deposits. The full pass runs after categorization, so
+ * transfers are excluded; `labelledOnly` only considers deposits already labelled as income.
+ */
+export async function detectIncome(userId: string, opts: { labelledOnly?: boolean } = {}) {
   try {
     await withUser(userId, async (tx) => {
       const today = todayIn(await loadTimezone(tx, userId));
-      await syncDetectedIncome(tx, await loadUserCrypto(tx, getKeyProvider(), userId), today.iso);
+      await syncDetectedIncome(tx, await loadUserCrypto(tx, getKeyProvider(), userId), today.iso, opts);
     });
   } catch (err) {
     console.error("income detection failed", { error: (err as Error).message });

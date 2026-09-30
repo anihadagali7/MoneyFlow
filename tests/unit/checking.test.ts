@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { reclassifyCardPayments } from "@/lib/categorize/payments";
 import { loadUserCrypto } from "@/lib/crypto/userCrypto";
@@ -151,6 +151,34 @@ describe("checking accounts", () => {
     await run((tx, c) => dismissPayer(tx, c, ended.merchantHash!));
     await run((tx, c) => syncDetectedIncome(tx, c, "2026-09-20"));
     expect(await runAsUser(db, U, (tx) => tx.select().from(incomeSources))).toHaveLength(0);
+  });
+
+  it("adds pay found only in older history as ended income, so past months count it", async () => {
+    // First look is in December: these paychecks stopped in September (e.g. an imported file).
+    const created = await runAsUser(db, U, async (tx) =>
+      syncDetectedIncome(tx, await loadUserCrypto(tx, provider, U), "2026-12-20"),
+    );
+    expect(created).toBe(1);
+    const [source] = await runAsUser(db, U, (tx) => tx.select().from(incomeSources));
+    expect(source).toMatchObject({ origin: "detected", endDate: "2026-09-11" });
+    const income = await runAsUser(db, U, (tx) => loadIncomeByMonth(tx, "2026-08-01", "2027-01-01"));
+    expect(Object.fromEntries(income)).toEqual({ "2026-08": 2 * 2861_54, "2026-09": 2861_54 });
+  });
+
+  it("only adds pay already labelled as income before the categorizer runs", async () => {
+    const early = (today: string) =>
+      runAsUser(db, U, async (tx) =>
+        syncDetectedIncome(tx, await loadUserCrypto(tx, provider, U), today, { labelledOnly: true }),
+      );
+    expect(await early("2026-09-20")).toBe(0); // paychecks aren't labelled yet
+    await runAsUser(db, U, async (tx) => {
+      const [salary] = await tx.select().from(categories).where(eq(categories.slug, "income_salary"));
+      await tx
+        .update(transactions)
+        .set({ categoryId: salary.id, categorySource: "llm" })
+        .where(like(transactions.plaidTransactionId, "pay-%"));
+    });
+    expect(await early("2026-09-20")).toBe(1);
   });
 
   it("doesn't duplicate income the user already entered by hand", async () => {

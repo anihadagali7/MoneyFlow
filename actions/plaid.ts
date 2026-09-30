@@ -12,7 +12,7 @@ import { getKeyProvider } from "@/lib/crypto/keyProvider";
 import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { withUser } from "@/lib/db";
 import { auditLog, plaidItems } from "@/lib/db/schema";
-import { categorizeForUser, refreshUser, syncUser } from "@/lib/jobs";
+import { processUser, refreshUser, removeDuplicateImports, syncUser } from "@/lib/jobs";
 import { getPlaid } from "@/lib/plaid/client";
 
 /** Calls Plaid, logging Plaid's error details (not just "status code 400") on failure. */
@@ -33,7 +33,10 @@ type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: s
  * re-authenticates, "add_accounts" lets the user pick more accounts (e.g. checking at the
  * same bank as a card) without creating, or paying for, another connection.
  */
-export async function createLinkToken(itemId?: string, mode: "reconnect" | "add_accounts" = "reconnect"): Promise<ActionResult<string>> {
+export async function createLinkToken(
+  itemId?: string,
+  mode: "reconnect" | "add_accounts" = "reconnect",
+): Promise<ActionResult<string>> {
   const userId = await requireUser();
   if (!(await allow(userId, "plaid.link"))) return { ok: false, error: new RateLimitError().message };
   let accessToken: string | undefined;
@@ -47,24 +50,29 @@ export async function createLinkToken(itemId?: string, mode: "reconnect" | "add_
     if (!accessToken) return { ok: false, error: "Card connection not found" };
   }
 
-  const { data } = await plaidCall(() => getPlaid().linkTokenCreate({
-    user: { client_user_id: userId },
-    client_name: "MoneyFlow",
-    language: "en",
-    country_codes: [CountryCode.Us],
-    webhook: process.env.PLAID_WEBHOOK_URL || undefined,
-    ...(accessToken
-      ? { access_token: accessToken, ...(mode === "add_accounts" ? { update: { account_selection_enabled: true } } : {}) }
-      : {
-          products: [Products.Transactions],
-          transactions: { days_requested: 730 },
-          account_filters: {
-            // "all" covers credit and charge cards; Plaid rejects "charge card" as a filter value.
-            credit: { account_subtypes: [CreditAccountSubtype.All] },
-            depository: { account_subtypes: [DepositoryAccountSubtype.Checking, DepositoryAccountSubtype.Savings] },
-          },
-        }),
-  }));
+  const { data } = await plaidCall(() =>
+    getPlaid().linkTokenCreate({
+      user: { client_user_id: userId },
+      client_name: "MoneyFlow",
+      language: "en",
+      country_codes: [CountryCode.Us],
+      webhook: process.env.PLAID_WEBHOOK_URL || undefined,
+      ...(accessToken
+        ? {
+            access_token: accessToken,
+            ...(mode === "add_accounts" ? { update: { account_selection_enabled: true } } : {}),
+          }
+        : {
+            products: [Products.Transactions],
+            transactions: { days_requested: 730 },
+            account_filters: {
+              // "all" covers credit and charge cards; Plaid rejects "charge card" as a filter value.
+              credit: { account_subtypes: [CreditAccountSubtype.All] },
+              depository: { account_subtypes: [DepositoryAccountSubtype.Checking, DepositoryAccountSubtype.Savings] },
+            },
+          }),
+    }),
+  );
   if (!data) return { ok: false, error: "Couldn't start Plaid. Check the server logs for details." };
   return { ok: true, data: data.link_token };
 }
@@ -115,12 +123,13 @@ export async function exchangePublicToken(input: z.infer<typeof ExchangeInput>):
   return { ok: true, data: undefined };
 }
 
-/** Pulls the latest transactions for all of the user's cards now; categorizes in the background. */
+/** Pulls the latest transactions for all of the user's cards now; categorizes and detects income in the background. */
 export async function syncNow(): Promise<ActionResult> {
   const userId = await requireUser();
   if (!(await allow(userId, "sync"))) return { ok: false, error: new RateLimitError().message };
   await syncUser(userId);
-  after(() => categorizeForUser(userId));
+  await removeDuplicateImports(userId);
+  after(() => processUser(userId));
   revalidatePath("/dashboard");
   revalidatePath("/transactions");
   return { ok: true, data: undefined };

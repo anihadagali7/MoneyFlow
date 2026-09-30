@@ -8,7 +8,7 @@ import { withUser } from "@/lib/db";
 import { allow } from "@/lib/guard";
 import { applyImport, previewImport } from "@/lib/import";
 import { ImportError, parseTransactionsCsv, type ImportRow } from "@/lib/import/csv";
-import { categorizeForUser, checkBudgets, detectIncome, detectSubscriptions } from "@/lib/jobs";
+import { processUser } from "@/lib/jobs";
 import { loadUserContext } from "@/lib/user";
 
 const MAX_CHARS = 1_500_000;
@@ -31,7 +31,8 @@ export type PreviewResult =
   | { ok: false; error: string };
 
 function parse(text: string, flipSign: boolean) {
-  if (text.length > MAX_CHARS) throw new ImportError("That file is too large. Download a shorter date range and try again.");
+  if (text.length > MAX_CHARS)
+    throw new ImportError("That file is too large. Download a shorter date range and try again.");
   return parseTransactionsCsv(text, flipSign);
 }
 
@@ -75,12 +76,7 @@ export async function importCsv(
       return applyImport(tx, crypto, z.uuid().parse(accountId), rows);
     });
     // Label what rules and the cache didn't, then refresh what depends on history.
-    after(async () => {
-      await categorizeForUser(userId);
-      await detectIncome(userId);
-      await checkBudgets(userId);
-      await detectSubscriptions(userId);
-    });
+    after(() => processUser(userId));
     revalidatePath("/", "layout");
     return { ok: true, imported };
   } catch (err) {

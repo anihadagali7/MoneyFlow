@@ -9,9 +9,9 @@ import { applyMerchantCategories, loadCategoryIds } from "@/lib/plaid/sync";
 import { shiftDays } from "@/lib/trips/detect";
 import { ImportError, type ImportRow } from "./csv";
 
-const MATCH_DAYS = 2; // banks and Plaid can disagree on the date by a day or two
+export const MATCH_DAYS = 2; // banks and Plaid can disagree on the date by a day or two
 const utc = (d: string) => Date.parse(`${d}T00:00:00Z`);
-const daysApart = (a: string, b: string) => Math.abs(utc(a) - utc(b)) / 86_400_000;
+export const daysApart = (a: string, b: string) => Math.abs(utc(a) - utc(b)) / 86_400_000;
 
 export type ImportPreview = {
   total: number;
