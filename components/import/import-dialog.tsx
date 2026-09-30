@@ -27,18 +27,21 @@ export function ImportDialog({
   bank,
   open,
   onOpenChange,
+  initialPreview = null,
 }: {
   accountId: string;
   label: string;
   bank: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Only for the dev preview page, to review the preview step's layout. */
+  initialPreview?: Preview | null;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [text, setText] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [flip, setFlip] = useState(false);
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [preview, setPreview] = useState<Preview | null>(initialPreview);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -60,12 +63,13 @@ export function ImportDialog({
         <DialogHeader>
           <DialogTitle>Import older transactions</DialogTitle>
           <DialogDescription>
-            {label}. Plaid only gets the history {bank} shares, often about 90 days. A CSV from {bank}&apos;s website fills in the rest.
+            {label}. Plaid only gets the history {bank} shares, often about 90 days. A CSV from {bank}&apos;s website
+            fills in the rest.
           </DialogDescription>
         </DialogHeader>
 
         {!preview && (
-          <div className="grid gap-3 text-sm">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-3 text-sm">
             <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
               <li>On {bank}&apos;s website, open this account&apos;s transactions.</li>
               <li>Choose Download, pick a date range and the CSV format.</li>
@@ -93,19 +97,32 @@ export function ImportDialog({
         )}
 
         {preview && (
-          <div className="grid gap-3 text-sm">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-3 text-sm">
             <div className="rounded-xl bg-muted/60 p-4">
               <div className="text-2xl font-semibold">
                 {preview.newCount} new transaction{preview.newCount === 1 ? "" : "s"}
               </div>
-              <div className="mt-1 text-muted-foreground">
-                {shortDate(preview.from)}, {preview.from.slice(0, 4)} – {shortDate(preview.to)},{" "}
-                {preview.to.slice(0, 4)} · {formatCents(preview.spentCents)} spent
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {preview.duplicates > 0 && `${preview.duplicates} already in MoneyFlow will be skipped. `}
-                {preview.skipped > 0 && `${preview.skipped} row${preview.skipped === 1 ? "" : "s"} couldn't be read.`}
-              </div>
+              {preview.newCount > 0 && (
+                <div className="mt-1 text-muted-foreground">
+                  {shortDate(preview.from)}, {preview.from.slice(0, 4)} – {shortDate(preview.to)},{" "}
+                  {preview.to.slice(0, 4)} · {formatCents(preview.spentCents)} spent
+                </div>
+              )}
+              <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                {preview.alreadySynced > 0 && preview.syncedFrom && (
+                  <li>
+                    {preview.alreadySynced} from {shortDate(preview.syncedFrom)}, {preview.syncedFrom.slice(0, 4)}{" "}
+                    onward are skipped: your {bank} connection already has that period.
+                  </li>
+                )}
+                {preview.duplicates > 0 && <li>{preview.duplicates} already in MoneyFlow will be skipped.</li>}
+                {preview.skipped > 0 && (
+                  <li>
+                    {preview.skipped} row{preview.skipped === 1 ? "" : "s"} couldn&apos;t be read.
+                  </li>
+                )}
+                <li>Card payments and transfers aren&apos;t counted as spending.</li>
+              </ul>
             </div>
             {preview.sample.length > 0 && (
               <ul className="divide-y rounded-xl border">

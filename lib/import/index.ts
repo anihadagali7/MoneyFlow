@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, lte, min, notLike } from "drizzle-orm";
 import { isCardPayment } from "@/lib/categorize/payments";
 import type { UserCrypto } from "@/lib/crypto/userCrypto";
 import type { Tx } from "@/lib/db/core";
@@ -16,7 +16,12 @@ const daysApart = (a: string, b: string) => Math.abs(utc(a) - utc(b)) / 86_400_0
 export type ImportPreview = {
   total: number;
   newRows: ImportRow[];
+  /** Rows matching a transaction already in MoneyFlow. */
   duplicates: number;
+  /** Rows dated inside the period the bank connection already synced, so skipped. */
+  alreadySynced: number;
+  /** The first date synced from the bank, if any: only older rows are imported. */
+  syncedFrom: string | null;
   from: string;
   to: string;
   spentCents: number;
@@ -32,15 +37,23 @@ async function loadAccount(tx: Tx, accountId: string) {
 }
 
 /**
- * Splits the file's rows into new ones and ones already in MoneyFlow. A row is a duplicate
- * when an existing transaction on the same account has the same amount within 2 days
- * (each existing transaction can match only once, so two real $5 coffees stay two).
+ * Splits the file's rows into new ones and ones MoneyFlow already has.
+ *
+ * The bank connection is the source of truth for the period it covers, so only rows dated
+ * before the first synced transaction are imported (a file's dates and descriptions often
+ * differ slightly from Plaid's, which would otherwise create near-duplicates). Among those,
+ * a row is still skipped if an existing transaction has the same amount within 2 days; each
+ * existing one matches once, so two real $5 coffees stay two.
  */
 export async function previewImport(tx: Tx, accountId: string, rows: ImportRow[]): Promise<ImportPreview> {
-  await loadAccount(tx, accountId);
-  const dates = rows.map((r) => r.date).sort();
-  const from = dates[0];
-  const to = dates[dates.length - 1];
+  const account = await loadAccount(tx, accountId);
+  const [{ syncedFrom }] = await tx
+    .select({ syncedFrom: min(transactions.date) })
+    .from(transactions)
+    .where(and(eq(transactions.accountId, accountId), notLike(transactions.plaidTransactionId, "import:%")));
+  const older = syncedFrom ? rows.filter((r) => r.date < syncedFrom) : rows;
+  const alreadySynced = rows.length - older.length;
+  const fileDates = rows.map((r) => r.date).sort();
   const existing = await tx
     .select({
       date: transactions.date,
@@ -51,14 +64,14 @@ export async function previewImport(tx: Tx, accountId: string, rows: ImportRow[]
     .where(
       and(
         eq(transactions.accountId, accountId),
-        gte(transactions.date, shiftDays(from, -MATCH_DAYS - 3)),
-        lte(transactions.date, shiftDays(to, MATCH_DAYS + 3)),
+        gte(transactions.date, shiftDays(fileDates[0], -MATCH_DAYS - 3)),
+        lte(transactions.date, shiftDays(fileDates[fileDates.length - 1], MATCH_DAYS + 3)),
       ),
     );
 
   const used = new Set<number>();
   const newRows: ImportRow[] = [];
-  for (const r of rows) {
+  for (const r of older) {
     const idx = existing.findIndex(
       (e, i) =>
         !used.has(i) &&
@@ -70,13 +83,28 @@ export async function previewImport(tx: Tx, accountId: string, rows: ImportRow[]
     if (idx >= 0) used.add(idx);
     else newRows.push(r);
   }
+  const newDates = newRows.map((r) => r.date).sort();
+  const from = newDates[0] ?? fileDates[0];
+  const to = newDates[newDates.length - 1] ?? fileDates[fileDates.length - 1];
+  // "Spent" leaves out card payments and transfers, like the rest of the app.
+  const isPayment = (r: ImportRow) =>
+    isCardPayment({
+      amountCents: r.amountCents,
+      accountType: account.type,
+      pfcPrimary: null,
+      pfcDetailed: null,
+      description: r.description,
+      merchantName: null,
+    });
   return {
     total: rows.length,
     newRows,
-    duplicates: rows.length - newRows.length,
+    duplicates: older.length - newRows.length,
+    alreadySynced,
+    syncedFrom: syncedFrom ?? null,
     from,
     to,
-    spentCents: newRows.filter((r) => r.amountCents > 0).reduce((a, r) => a + r.amountCents, 0),
+    spentCents: newRows.filter((r) => r.amountCents > 0 && !isPayment(r)).reduce((a, r) => a + r.amountCents, 0),
   };
 }
 

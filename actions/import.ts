@@ -19,6 +19,8 @@ export type PreviewResult =
       total: number;
       newCount: number;
       duplicates: number;
+      alreadySynced: number;
+      syncedFrom: string | null;
       skipped: number;
       from: string;
       to: string;
@@ -44,6 +46,8 @@ export async function previewCsvImport(accountId: string, text: string, flipSign
       total: preview.total,
       newCount: preview.newRows.length,
       duplicates: preview.duplicates,
+      alreadySynced: preview.alreadySynced,
+      syncedFrom: preview.syncedFrom,
       skipped: parsed.skipped,
       from: preview.from,
       to: preview.to,

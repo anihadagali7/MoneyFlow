@@ -18,8 +18,15 @@ export type ParseResult = {
 
 export class ImportError extends Error {}
 
-/** RFC 4180-ish: quoted fields, doubled quotes, commas and newlines inside quotes, CRLF. */
-export function parseCsv(text: string): string[][] {
+/** The separator used on the header line: comma, tab or semicolon (outside quotes). */
+export function detectDelimiter(text: string): string {
+  const firstLine = text.replace(/^\uFEFF/, "").split(/\r?\n/, 1)[0].replace(/"[^"]*"/g, "");
+  const counts = [",", "\t", ";"].map((d) => [d, firstLine.split(d).length - 1] as const);
+  return counts.sort((a, b) => b[1] - a[1])[0][1] > 0 ? counts[0][0] : ",";
+}
+
+/** RFC 4180-ish: quoted fields, doubled quotes, separators and newlines inside quotes, CRLF. */
+export function parseCsv(text: string, delimiter = detectDelimiter(text)): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -34,7 +41,7 @@ export function parseCsv(text: string): string[][] {
       } else if (c === '"') quoted = false;
       else field += c;
     } else if (c === '"') quoted = true;
-    else if (c === ",") {
+    else if (c === delimiter) {
       row.push(field);
       field = "";
     } else if (c === "\n" || c === "\r") {
@@ -110,7 +117,11 @@ export function parseTransactionsCsv(text: string, flipSign = false): ParseResul
       "Couldn't find the date, description and amount columns. Download the CSV from your bank's website and try again.",
     );
   }
-  const format: ParseResult["format"] = debit >= 0 && credit >= 0 ? "debit_credit" : type >= 0 ? "typed" : "single";
+  // If the amounts are already signed (e.g. Chase), the sign is the truth and a type column
+  // like "ACH_DEBIT" is just detail. Otherwise a Debit/Credit type column gives direction.
+  const signed = amount >= 0 && table.slice(1).some((r) => (parseAmount(r[amount] ?? "") ?? 0) < 0);
+  const format: ParseResult["format"] =
+    debit >= 0 && credit >= 0 ? "debit_credit" : type >= 0 && !signed ? "typed" : "single";
 
   const rows: ImportRow[] = [];
   let skipped = 0;
@@ -127,7 +138,7 @@ export function parseTransactionsCsv(text: string, flipSign = false): ParseResul
       if (a !== null) {
         if (format === "typed") {
           const t = (r[type] ?? "").trim().toLowerCase();
-          cents = t.startsWith("debit") || t === "withdrawal" ? Math.abs(a) : t.startsWith("credit") || t === "deposit" ? -Math.abs(a) : -a;
+          cents = /debit|withdrawal/.test(t) ? Math.abs(a) : /credit|deposit/.test(t) ? -Math.abs(a) : -a;
         } else {
           cents = flipSign ? a : -a; // bank sign (negative = out) → Plaid sign (positive = out)
         }

@@ -7,5 +7,7 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"],
     testTimeout: 30_000,
+    // Setup creates an in-memory Postgres and runs every migration; allow for a busy machine.
+    hookTimeout: 30_000,
   },
 });

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/shell/app-shell";
 import { AccountsView } from "@/components/views/accounts-view";
+import { ImportPreviewDemo } from "@/components/dev/import-preview-demo";
 import { BudgetsView } from "@/components/views/budgets-view";
 import { GoalDetailView } from "@/components/views/goal-detail-view";
 import { GoalsView } from "@/components/views/goals-view";
@@ -102,6 +103,58 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
       ),
     },
     accounts: { href: "/accounts", node: <AccountsView items={f.items} now={f.now} /> },
+    "import-preview": {
+      href: "/accounts",
+      node: (
+        <>
+          <AccountsView items={f.items} now={f.now} />
+          <ImportPreviewDemo
+            accountId="chk-1"
+            label="TOTAL CHECKING ••9975"
+            bank="Chase"
+            initialPreview={{
+              ok: true,
+              total: 338,
+              newCount: 262,
+              duplicates: 4,
+              alreadySynced: 72,
+              syncedFrom: "2026-07-02",
+              skipped: 0,
+              from: "2025-01-03",
+              to: "2026-07-01",
+              spentCents: 41_220_17,
+              format: "single",
+              sample: [
+                {
+                  date: "2025-01-03",
+                  authorizedDate: null,
+                  description: "Wealthfront EDI PYMNTS 9B2E4DFFB20D4D WEB ID: 4271967207",
+                  amountCents: 500_00,
+                },
+                {
+                  date: "2025-01-06",
+                  authorizedDate: null,
+                  description: "PP*APPLE.COM/BILL 800-275-2273 CA 01/04",
+                  amountCents: 2_99,
+                },
+                {
+                  date: "2025-01-10",
+                  authorizedDate: null,
+                  description: "ORIG CO NAME:FORD MOTOR COMPA CO ENTRY DESCR:PAYROLLDD SEC:PPD ORIG ID:1380549190",
+                  amountCents: -3268_42,
+                },
+                {
+                  date: "2025-01-13",
+                  authorizedDate: null,
+                  description: "AMERICAN EXPRESS ACH PMT A7114 WEB ID: 9493560001",
+                  amountCents: 1420_00,
+                },
+              ],
+            }}
+          />
+        </>
+      ),
+    },
     settings: {
       href: "/settings",
       node: (

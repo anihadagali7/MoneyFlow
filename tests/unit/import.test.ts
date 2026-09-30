@@ -22,6 +22,7 @@ const csv = [
   "2026-06-02,2026-06-03,4821,BLUE BOTTLE COFFEE,Dining,6.75,",
   "2026-06-02,2026-06-03,4821,BLUE BOTTLE COFFEE,Dining,6.75,", // two coffees that day
   "2026-07-01,2026-07-02,4821,WHOLE FOODS #123,Groceries,142.18,", // Plaid already has this one
+  "2026-08-10,2026-08-11,4821,WHOLE FOODS MKT,Groceries,98.00,", // inside the synced period, but no exact match
 ].join("\n");
 
 beforeEach(async () => {
@@ -53,8 +54,10 @@ const doImport = () =>
 describe("CSV import", () => {
   it("previews new vs. already-synced rows without saving anything", async () => {
     const preview = await runAsUser(db, U, (tx) => previewImport(tx, accountId, rows));
-    expect(preview).toMatchObject({ total: 5, duplicates: 1, from: "2026-03-05", to: "2026-07-02" });
+    // Plaid's data starts Jul 1: only older rows are imported, even without an exact match.
+    expect(preview).toMatchObject({ total: 6, alreadySynced: 2, duplicates: 0, syncedFrom: "2026-07-01", from: "2026-03-05", to: "2026-06-03" });
     expect(preview.newRows).toHaveLength(4);
+    // The $1,250 autopay credit isn't spending.
     expect(preview.spentCents).toBe(15_49 + 6_75 + 6_75);
     expect(await runAsUser(db, U, (tx) => tx.select().from(transactions))).toHaveLength(1);
   });
@@ -77,5 +80,17 @@ describe("CSV import", () => {
   it("refuses another user's account", async () => {
     await seedUserWithItem(db, "other", "item-other");
     await expect(runAsUser(db, "other", (tx) => previewImport(tx, accountId, rows))).rejects.toThrow("wasn't found");
+  });
+});
+
+describe("importing into an account with no synced history", () => {
+  it("falls back to matching duplicates by amount and date", async () => {
+    // Remove the Plaid row, then import a file that contains a matching row twice over two imports.
+    await runAsUser(db, U, (tx) => tx.delete(transactions));
+    const first = await runAsUser(db, U, async (tx) => applyImport(tx, await loadUserCrypto(tx, provider, U), accountId, rows));
+    expect(first).toBe(6);
+    const again = await runAsUser(db, U, (tx) => previewImport(tx, accountId, rows));
+    expect(again).toMatchObject({ syncedFrom: null, duplicates: 6 });
+    expect(again.newRows).toHaveLength(0);
   });
 });

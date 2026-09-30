@@ -21,6 +21,7 @@ const ACTION_LABEL: Record<string, string> = {
   "card.remove": "Removed a card",
   "card.restore": "Added a card back",
   "category.delete": "Deleted a category",
+  import: "Imported transactions from a file",
   "rule.create": "Created a category rule",
   export: "Downloaded your data",
   "account.delete": "Deleted account",

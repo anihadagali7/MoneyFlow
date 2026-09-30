@@ -74,3 +74,36 @@ describe("parseTransactionsCsv", () => {
     expect(() => parseTransactionsCsv("Date,Description,Amount\n")).toThrow(ImportError);
   });
 });
+
+describe("real exports pasted by the user", () => {
+  it("reads a Chase checking export (signed amounts win over the Type column)", () => {
+    const csv = [
+      "Details,Posting Date,Description,Amount,Type,Balance,Check or Slip #,",
+      "CREDIT,09/30/2026,ORIG CO NAME:FORD MOTOR COMPA CO ENTRY DESCR:PAYROLLDD  SEC:PPD  ORIG ID:1380549190,3268.42,ACH_CREDIT, ,,",
+      "DEBIT,09/28/2026,VERIZON          PAYMENTREC                 PPD ID: 9783397101,-19.99,ACH_DEBIT,2815.57,,",
+      "DEBIT,09/16/2026,Wealthfront      EDI PYMNTS 45D13F762C5046  WEB ID: 4271967207,-500.00,MISC_DEBIT,2835.56,,",
+    ].join("\n");
+    const { rows, format } = parseTransactionsCsv(csv);
+    expect(format).toBe("single");
+    expect(rows.map((r) => [r.date, r.amountCents])).toEqual([
+      ["2026-09-30", -3268_42], // paycheck: money in
+      ["2026-09-28", 19_99],
+      ["2026-09-16", 500_00],
+    ]);
+  });
+
+  it("reads the same exports when tab-separated (copied through a spreadsheet)", () => {
+    const tabbed = [
+      "Transaction Date\tPosted Date\tCard No.\tDescription\tCategory\tDebit\tCredit",
+      "2025-12-28\t2025-12-29\t993\tHERTZTOLL 963357183\tGas/Automotive\t0.94\t",
+      "2025-12-23\t2025-12-26\t993\tMACYS  NEWPORT CENTRE\tMerchandise\t\t92.54",
+    ].join("\n");
+    const { rows, format } = parseTransactionsCsv(tabbed);
+    expect(format).toBe("debit_credit");
+    expect(rows.map((r) => [r.date, r.authorizedDate, r.description, r.amountCents])).toEqual([
+      ["2025-12-29", "2025-12-28", "HERTZTOLL 963357183", 94],
+      ["2025-12-26", "2025-12-23", "MACYS  NEWPORT CENTRE", -92_54],
+    ]);
+    expect(parseTransactionsCsv("Date;Description;Amount\n03/01/2026;CAFE;-4.50").rows[0].amountCents).toBe(4_50);
+  });
+});
