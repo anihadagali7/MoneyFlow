@@ -3,9 +3,22 @@
 import { useState, useTransition, type ReactElement } from "react";
 import { MoreHorizontalIcon, PencilIcon, PlusIcon, RepeatIcon, Trash2Icon, WalletIcon } from "lucide-react";
 import { toast } from "sonner";
-import { deleteIncomeEntry, deleteIncomeSource, saveIncomeEntry, saveIncomeSource } from "@/actions/income";
+import {
+  deleteIncomeEntry,
+  deleteIncomeSource,
+  dismissIncomeSuggestionAction,
+  saveIncomeEntry,
+  saveIncomeSource,
+} from "@/actions/income";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +46,9 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint?
 function MoneyInput({ id, defaultValue }: { id: string; defaultValue?: number }) {
   return (
     <div className="relative">
-      <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+      <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-sm text-muted-foreground">
+        $
+      </span>
       <Input
         id={id}
         name="amount"
@@ -47,18 +62,23 @@ function MoneyInput({ id, defaultValue }: { id: string; defaultValue?: number })
   );
 }
 
+export type IncomePrefill = { label: string; amountCents: number; frequency: IncomeFrequency; anchorDate: string };
+
 export function IncomeSourceDialog({
   source,
+  prefill,
   open,
   onOpenChange,
   today,
 }: {
   source?: IncomeSourceView;
+  prefill?: IncomePrefill;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   today: string;
 }) {
-  const [frequency, setFrequency] = useState<IncomeFrequency>(source?.frequency ?? "biweekly");
+  const initial = source ?? prefill;
+  const [frequency, setFrequency] = useState<IncomeFrequency>(initial?.frequency ?? "biweekly");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -84,18 +104,31 @@ export function IncomeSourceDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{source ? "Edit recurring income" : "Add recurring income"}</DialogTitle>
-          <DialogDescription>A paycheck or other income that arrives on a schedule. Use the take-home amount.</DialogDescription>
+          <DialogDescription>
+            A paycheck or other income that arrives on a schedule. Use the take-home amount.
+          </DialogDescription>
         </DialogHeader>
         <form action={submit} className="grid gap-4">
           <Field id="label" label="Name">
-            <Input id="label" name="label" required maxLength={80} placeholder="e.g. Acme salary" defaultValue={source?.label} />
+            <Input
+              id="label"
+              name="label"
+              required
+              maxLength={80}
+              placeholder="e.g. Acme salary"
+              defaultValue={initial?.label}
+            />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="amount" label="Amount per paycheck">
-              <MoneyInput id="amount" defaultValue={source?.amountCents} />
+              <MoneyInput id="amount" defaultValue={initial?.amountCents} />
             </Field>
             <Field id="frequency" label="How often">
-              <Select items={frequencyItems} value={frequency} onValueChange={(v) => setFrequency(v as IncomeFrequency)}>
+              <Select
+                items={frequencyItems}
+                value={frequency}
+                onValueChange={(v) => setFrequency(v as IncomeFrequency)}
+              >
                 <SelectTrigger id="frequency" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -111,7 +144,13 @@ export function IncomeSourceDialog({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="anchorDate" label="A recent pay date" hint="Used to work out the schedule">
-              <Input id="anchorDate" name="anchorDate" type="date" required defaultValue={source?.anchorDate ?? today} />
+              <Input
+                id="anchorDate"
+                name="anchorDate"
+                type="date"
+                required
+                defaultValue={initial?.anchorDate ?? today}
+              />
             </Field>
             <Field id="endDate" label="End date (optional)" hint="Leave empty if ongoing">
               <Input id="endDate" name="endDate" type="date" defaultValue={source?.endDate ?? undefined} />
@@ -170,7 +209,14 @@ export function IncomeEntryDialog({
         </DialogHeader>
         <form action={submit} className="grid gap-4">
           <Field id="entry-label" label="Name">
-            <Input id="entry-label" name="label" required maxLength={80} placeholder="e.g. Tax refund" defaultValue={entry?.label} />
+            <Input
+              id="entry-label"
+              name="label"
+              required
+              maxLength={80}
+              placeholder="e.g. Tax refund"
+              defaultValue={entry?.label}
+            />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="entry-amount" label="Amount">
@@ -213,7 +259,11 @@ export function AddIncomeButton({ today, variant = "default" }: { today: string;
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <IncomeSourceDialog open={dialog === "source"} onOpenChange={(o) => setDialog(o ? "source" : null)} today={today} />
+      <IncomeSourceDialog
+        open={dialog === "source"}
+        onOpenChange={(o) => setDialog(o ? "source" : null)}
+        today={today}
+      />
       <IncomeEntryDialog open={dialog === "entry"} onOpenChange={(o) => setDialog(o ? "entry" : null)} today={today} />
     </>
   );
@@ -246,7 +296,9 @@ export function IncomeRowMenu({
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`Options for ${name}`} disabled={pending} />}>
+        <DropdownMenuTrigger
+          render={<Button variant="ghost" size="icon-sm" aria-label={`Options for ${name}`} disabled={pending} />}
+        >
           <MoreHorizontalIcon />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -264,5 +316,35 @@ export function IncomeRowMenu({
         <IncomeEntryDialog entry={entry} open={editing} onOpenChange={setEditing} today={today} />
       )}
     </>
+  );
+}
+
+/** "Add" and "Not income" for a paycheck found in a linked bank account. */
+export function IncomeSuggestionActions({
+  suggestionKey,
+  prefill,
+  today,
+}: {
+  suggestionKey: string;
+  prefill: IncomePrefill;
+  today: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <PlusIcon /> Add
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={pending}
+        onClick={() => startTransition(async () => void (await dismissIncomeSuggestionAction(suggestionKey)))}
+      >
+        Not income
+      </Button>
+      {open && <IncomeSourceDialog prefill={prefill} open={open} onOpenChange={setOpen} today={today} />}
+    </div>
   );
 }

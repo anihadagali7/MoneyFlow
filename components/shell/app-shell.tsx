@@ -27,8 +27,8 @@ export const NAV = [
   { href: "/trips", label: "Trips", icon: PlaneIcon, mobile: false },
   { href: "/reports", label: "Reports", icon: ChartColumnIcon, mobile: true },
   { href: "/income", label: "Income", icon: WalletIcon, mobile: true },
-  // On phones, Cards lives under Settings to keep the tab bar to five.
-  { href: "/accounts", label: "Cards", icon: CreditCardIcon, mobile: false },
+  // On phones, Accounts lives under Settings to keep the tab bar to five.
+  { href: "/accounts", label: "Accounts", icon: CreditCardIcon, mobile: false },
 ] as const;
 
 function SettingsLink({ active }: { active: boolean }) {

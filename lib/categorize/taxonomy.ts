@@ -24,9 +24,12 @@ export const CATEGORY_SLUGS = [
   "gifts_donations",
   "insurance",
   "fees_interest",
+  "cash_atm",
   "other",
   "payments_transfers",
   "rewards_credits",
+  "income_salary",
+  "income_other",
 ] as const;
 
 export type CategorySlug = (typeof CATEGORY_SLUGS)[number];

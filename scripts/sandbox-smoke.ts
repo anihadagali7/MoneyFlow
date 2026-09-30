@@ -53,6 +53,7 @@ async function main() {
     const results = await createClaudeCategorizer()(
       sample.map((t, i) => ({
         i,
+        acct: credit.has(t.account_id) ? ("card" as const) : ("bank" as const),
         merchant: t.merchant_name ?? null,
         desc: t.name,
         amount: t.amount,

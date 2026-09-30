@@ -2,6 +2,7 @@ import { desc, gte } from "drizzle-orm";
 import type { UserCrypto } from "@/lib/crypto/userCrypto";
 import type { Tx } from "@/lib/db/core";
 import { incomeEntries, incomeSources } from "@/lib/db/schema";
+import { loadIncomeSuggestions, type IncomeSuggestion } from "@/lib/income/suggest";
 import { addYears } from "@/lib/time";
 import { FREQUENCY_LABEL, occurrences, PER_MONTH, type IncomeFrequency } from "./income";
 
@@ -17,7 +18,13 @@ export type IncomeSourceView = {
   nextPayDate: string | null;
 };
 export type IncomeEntryView = { id: string; label: string; amountCents: number; receivedOn: string };
-export type IncomeData = { sources: IncomeSourceView[]; entries: IncomeEntryView[]; monthlyRecurringCents: number };
+export type IncomeData = {
+  sources: IncomeSourceView[];
+  entries: IncomeEntryView[];
+  monthlyRecurringCents: number;
+  /** Regular deposits in linked bank accounts that look like pay. */
+  suggestions: IncomeSuggestion[];
+};
 
 /** `today` is "YYYY-MM-DD" in the user's timezone. */
 export async function loadIncome(tx: Tx, crypto: UserCrypto, today: string): Promise<IncomeData> {
@@ -58,5 +65,6 @@ export async function loadIncome(tx: Tx, crypto: UserCrypto, today: string): Pro
       receivedOn: e.receivedOn,
     })),
     monthlyRecurringCents: sources.reduce((a, s) => a + s.monthlyCents, 0),
+    suggestions: await loadIncomeSuggestions(tx, crypto, today, sources.filter((s) => s.monthlyCents > 0)),
   };
 }

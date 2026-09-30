@@ -8,6 +8,9 @@ import type { CategorySlug } from "@/lib/categorize/taxonomy";
  */
 const RULES: Array<[RegExp, CategorySlug]> = [
   [/CREDIT_CARD_PAYMENT/, "payments_transfers"],
+  [/^INCOME_(WAGES|SALARY)/, "income_salary"],
+  [/^INCOME_(INTEREST|DIVIDENDS|TAX_REFUND|RETIREMENT|UNEMPLOYMENT|OTHER)/, "income_other"],
+  [/TRANSFER_OUT_WITHDRAWAL|ATM_WITHDRAWAL/, "cash_atm"],
   [/^TRANSFER_(IN|OUT)/, "payments_transfers"],
   [/GROCER/, "groceries"],
   [/COFFEE/, "coffee"],

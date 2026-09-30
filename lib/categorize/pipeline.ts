@@ -3,7 +3,7 @@ import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { KeyProvider } from "@/lib/crypto/keyProvider";
 import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import type { Tx } from "@/lib/db/core";
-import { categories, merchantCategories, transactions } from "@/lib/db/schema";
+import { accounts, categories, merchantCategories, transactions } from "@/lib/db/schema";
 import { loadCategoryIds, type RunAsUser } from "@/lib/plaid/sync";
 import type { Categorizer, FewShot, LlmResult, LlmTransaction } from "./llm";
 import { isCategorySlug } from "./taxonomy";
@@ -40,15 +40,18 @@ export async function categorizeUncategorized(
         amountCents: transactions.amountCents,
         date: transactions.date,
         pfc: transactions.plaidPfcDetailed,
+        accountType: accounts.type,
       })
       .from(transactions)
+      .innerJoin(accounts, eq(accounts.id, transactions.accountId))
       .where(isNull(transactions.categoryId))
       .orderBy(desc(transactions.date))
       .limit(batchSize * maxBatches * 5);
 
     const byKey = new Map<string, Group>();
     for (const r of rows) {
-      const key = r.merchantHash ? `${r.merchantHash.toString("hex")}:${r.amountCents < 0 ? "-" : "+"}` : r.id;
+      const acct = r.accountType === "credit" ? "card" : "bank";
+      const key = r.merchantHash ? `${r.merchantHash.toString("hex")}:${acct}:${r.amountCents < 0 ? "-" : "+"}` : r.id;
       const existing = byKey.get(key);
       if (existing) {
         existing.ids.push(r.id);
@@ -60,6 +63,7 @@ export async function categorizeUncategorized(
         ids: [r.id],
         merchantHash: r.merchantHash,
         sample: {
+          acct,
           merchant: crypto.decryptOrNull("transactions", "merchant_name_ct", r.merchantNameCt),
           desc: crypto.decrypt("transactions", "description_ct", r.descriptionCt),
           amount: r.amountCents / 100,

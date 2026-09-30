@@ -32,8 +32,8 @@ export function SettingsView({ data, now }: { data: SettingsData; now: number })
               <CreditCardIcon className="size-4" />
             </span>
             <div className="flex-1">
-              <div className="font-medium">Connected cards</div>
-              <div className="text-xs text-muted-foreground">Add, reconnect or disconnect banks</div>
+              <div className="font-medium">Accounts</div>
+              <div className="text-xs text-muted-foreground">Cards and bank accounts, balances, add or remove</div>
             </div>
             <ChevronRightIcon className="size-4 text-muted-foreground" />
           </Card>

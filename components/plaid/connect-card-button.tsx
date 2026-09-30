@@ -14,12 +14,14 @@ import { Button } from "@/components/ui/button";
  */
 export function ConnectCardButton({
   itemId,
-  label = "Connect a card",
+  mode = "reconnect",
+  label = "Connect an account",
   variant = "default",
 }: {
   itemId?: string;
+  mode?: "reconnect" | "add_accounts";
   label?: string;
-  variant?: "default" | "outline";
+  variant?: "default" | "outline" | "ghost";
 }) {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
@@ -42,7 +44,10 @@ export function ConnectCardButton({
               })
             : { ok: false as const, error: "Plaid didn't return a connection. Please try again." };
         if (!result.ok) setError(result.error);
-        else toast.success(itemId ? "Reconnected" : "Card connected", { description: "Importing your transactions now." });
+        else
+          toast.success(itemId ? (mode === "add_accounts" ? "Accounts updated" : "Reconnected") : "Account connected", {
+            description: "Importing your transactions now.",
+          });
         router.refresh();
       });
     },
@@ -62,13 +67,13 @@ export function ConnectCardButton({
         onClick={() => {
           setError(null);
           startTransition(async () => {
-            const result = await createLinkToken(itemId);
+            const result = await createLinkToken(itemId, mode);
             if (result.ok) setToken(result.data);
             else setError(result.error);
           });
         }}
       >
-        {!itemId && <PlusIcon />}
+        {(!itemId || mode === "add_accounts") && <PlusIcon />}
         {pending ? "Working…" : label}
       </Button>
       {error && <p className="text-sm text-destructive">{error}</p>}

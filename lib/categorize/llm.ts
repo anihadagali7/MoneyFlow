@@ -7,6 +7,7 @@ import { CATEGORY_SLUGS, type CategorySlug } from "./taxonomy";
 /** What we send per transaction. Nothing else about the user leaves the server. */
 export type LlmTransaction = {
   i: number;
+  acct: "card" | "bank";
   merchant: string | null;
   desc: string;
   amount: number;

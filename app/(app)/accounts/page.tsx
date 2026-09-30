@@ -7,7 +7,7 @@ import { withUser } from "@/lib/db";
 import { loadItems } from "@/lib/views/data";
 import { nowMs } from "@/lib/views/dates";
 
-export const metadata: Metadata = { title: "Cards" };
+export const metadata: Metadata = { title: "Accounts" };
 export const maxDuration = 60;
 
 export default async function AccountsPage() {

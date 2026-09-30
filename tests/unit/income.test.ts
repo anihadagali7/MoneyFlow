@@ -83,3 +83,17 @@ describe("todayIn", () => {
     expect(addYears("2026-09-30", -1)).toBe("2025-09-30");
   });
 });
+
+describe("detectPaycheck", () => {
+  it("recognizes every-2-weeks and twice-a-month pay", async () => {
+    const { detectPaycheck } = await import("@/lib/income/detect");
+    const biweekly = ["2026-07-03", "2026-07-17", "2026-07-31", "2026-08-14", "2026-08-28"].map((date) => ({ date, amountCents: 2861_54 }));
+    expect(detectPaycheck(biweekly)).toMatchObject({ frequency: "biweekly", amountCents: 2861_54, lastDate: "2026-08-28" });
+    const semi = ["2026-06-15", "2026-06-30", "2026-07-15", "2026-07-31", "2026-08-14", "2026-08-31"].map((date) => ({ date, amountCents: 3100_00 }));
+    expect(detectPaycheck(semi)?.frequency).toBe("semimonthly");
+    expect(detectPaycheck([{ date: "2026-08-01", amountCents: 500_00 }])).toBeNull();
+    // Biweekly dates that happen to sit near two days of the month are still biweekly.
+    const lookalike = ["2026-07-31", "2026-08-14", "2026-08-28", "2026-09-11"].map((date) => ({ date, amountCents: 2861_54 }));
+    expect(detectPaycheck(lookalike)?.frequency).toBe("biweekly");
+  });
+});

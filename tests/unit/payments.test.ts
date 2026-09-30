@@ -113,3 +113,34 @@ describe("card payments in sync and backfill", () => {
     expect(await slugOf("mine")).toEqual({ slug: "other", source: "user" });
   });
 });
+
+describe("checking accounts", () => {
+  const bank = (o: Partial<PaymentSignals>) => isCardPayment({ ...base, accountType: "depository", amountCents: 1000_00, ...o });
+
+  it.each([
+    "CAPITAL ONE ONLINE PMT",
+    "CAPITAL ONE MOBILE PYMT 240915",
+    "CHASE CREDIT CRD AUTOPAY",
+    "AMEX EPAYMENT ACH PMT",
+    "DISCOVER E-PAYMENT",
+    "APPLECARD GSBANK PAYMENT",
+    "CITI CARD ONLINE PAYMENT",
+    "BK OF AMER VISA ONLINE PMT",
+  ])("treats %s from checking as a card payment", (description) => {
+    expect(bank({ description })).toBe(true);
+  });
+
+  it("treats transfers between your own accounts as transfers", () => {
+    expect(bank({ description: "ONLINE TRANSFER TO SAV", pfcDetailed: "TRANSFER_OUT_SAVINGS" })).toBe(true);
+    expect(bank({ amountCents: -500_00, description: "TRANSFER FROM CHK", pfcDetailed: "TRANSFER_IN_ACCOUNT_TRANSFER" })).toBe(true);
+  });
+
+  it.each([
+    ["a debit card purchase", { description: "TRADER JOE'S #552" }],
+    ["rent paid by Zelle", { description: "ZELLE PAYMENT TO JOHN LANDLORD", pfcDetailed: "TRANSFER_OUT_ACCOUNT_TRANSFER".replace("ACCOUNT_TRANSFER", "WITHDRAWAL") }],
+    ["a paycheck", { amountCents: -2861_54, description: "ACME CORP PAYROLL DIRECT DEP" }],
+    ["a utility bill payment", { description: "CON ED PAYMENT" }],
+  ])("doesn't treat %s as a transfer", (_, o) => {
+    expect(bank(o as Partial<PaymentSignals>)).toBe(false);
+  });
+});

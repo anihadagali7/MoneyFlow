@@ -1,6 +1,6 @@
-import { CalendarIcon, WalletIcon } from "lucide-react";
+import { CalendarIcon, LandmarkIcon, WalletIcon } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
-import { AddIncomeButton, IncomeRowMenu } from "@/components/income/income-dialogs";
+import { AddIncomeButton, IncomeRowMenu, IncomeSuggestionActions } from "@/components/income/income-dialogs";
 import { PageHeader } from "@/components/page-header";
 import { StatTile } from "@/components/stat-tile";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,10 +14,42 @@ export function IncomeView({ data, today }: { data: IncomeData; today: string })
     .filter((s) => s.nextPayDate)
     .sort((a, b) => a.nextPayDate!.localeCompare(b.nextPayDate!))[0];
 
+  const found = data.suggestions.length > 0 && (
+    <Card className="mb-4">
+      <CardHeader>
+        <CardTitle>Found in your bank</CardTitle>
+        <CardDescription>
+          Regular deposits that look like pay. Add them to count toward your net each month.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="divide-y">
+          {data.suggestions.map((s) => (
+            <li key={s.key} className="flex flex-wrap items-center gap-3 py-3">
+              <LandmarkIcon className="size-4 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{s.name}</div>
+                <div className="text-xs text-muted-foreground">
+                  {formatCents(s.amountCents)} · {s.frequencyLabel.toLowerCase()} · last {shortDate(s.lastDate)}
+                </div>
+              </div>
+              <IncomeSuggestionActions
+                suggestionKey={s.key}
+                today={today}
+                prefill={{ label: s.name, amountCents: s.amountCents, frequency: s.frequency, anchorDate: s.lastDate }}
+              />
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+
   if (data.sources.length === 0 && data.entries.length === 0) {
     return (
       <>
         <PageHeader title="Income" description="What comes in, so MoneyFlow can show your net each month." />
+        {found}
         <Card>
           <EmptyState
             icon={WalletIcon}
@@ -38,14 +70,23 @@ export function IncomeView({ data, today }: { data: IncomeData; today: string })
         actions={<AddIncomeButton today={today} />}
       />
 
+      {found}
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatTile label="Expected per month" value={formatCents(data.monthlyRecurringCents)} hint="From recurring income, on average" />
+        <StatTile
+          label="Expected per month"
+          value={formatCents(data.monthlyRecurringCents)}
+          hint="From recurring income, on average"
+        />
         <StatTile
           label="Next paycheck"
           value={nextPay ? formatCents(nextPay.amountCents) : "—"}
           hint={nextPay ? `${nextPay.label} · ${dayLabel(nextPay.nextPayDate!, today)}` : "No upcoming pay dates"}
         />
-        <StatTile label="One-time, last 12 months" value={formatCents(oneTimeTotal)} hint={`${data.entries.length} payment${data.entries.length === 1 ? "" : "s"}`} />
+        <StatTile
+          label="One-time, last 12 months"
+          value={formatCents(oneTimeTotal)}
+          hint={`${data.entries.length} payment${data.entries.length === 1 ? "" : "s"}`}
+        />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -65,7 +106,11 @@ export function IncomeView({ data, today }: { data: IncomeData; today: string })
                       <div className="truncate text-sm font-medium">{s.label}</div>
                       <div className="text-xs text-muted-foreground">
                         {s.frequencyLabel}
-                        {s.nextPayDate ? ` · next ${shortDate(s.nextPayDate)}` : s.endDate ? ` · ended ${shortDate(s.endDate)}` : ""}
+                        {s.nextPayDate
+                          ? ` · next ${shortDate(s.nextPayDate)}`
+                          : s.endDate
+                            ? ` · ended ${shortDate(s.endDate)}`
+                            : ""}
                       </div>
                     </div>
                     <div className="text-right">

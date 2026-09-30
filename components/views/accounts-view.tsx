@@ -7,7 +7,8 @@ import { DisconnectButton } from "@/components/settings/disconnect-button";
 import { SyncButton } from "@/components/sync-button";
 import { Card } from "@/components/ui/card";
 import { relativeTime } from "@/lib/views/dates";
-import type { ItemSummary } from "@/lib/views/data";
+import { formatCents } from "@/lib/money";
+import type { AccountSummary, ItemSummary } from "@/lib/views/data";
 
 const STATUS: Record<string, { label: string; ok: boolean }> = {
   active: { label: "Connected", ok: true },
@@ -17,17 +18,31 @@ const STATUS: Record<string, { label: string; ok: boolean }> = {
   error: { label: "Sync error", ok: false },
 };
 
+const TYPE_LABEL: Record<string, string> = { credit: "Credit card", depository: "Bank account" };
+
+function accountKind(c: AccountSummary) {
+  if (c.type === "depository") return c.subtype === "savings" ? "Savings" : "Checking";
+  return TYPE_LABEL[c.type] ?? c.type;
+}
+
 export function AccountsView({ items, now }: { items: ItemSummary[]; now: number }) {
+  const cash = items
+    .flatMap((i) => i.cards)
+    .filter((c) => !c.removed && c.type === "depository" && c.balanceCents !== null)
+    .reduce((a, c) => a + c.balanceCents!, 0);
+  const hasBank = items.some((i) => i.cards.some((c) => c.type === "depository" && !c.removed));
   return (
     <>
       <PageHeader
-        title="Cards"
-        description="Banks connected through Plaid"
+        title="Accounts"
+        description={
+          hasBank ? `${formatCents(cash)} in checking and savings` : "Cards and bank accounts connected through Plaid"
+        }
         actions={
           items.length > 0 ? (
             <>
               <SyncButton />
-              <ConnectCardButton label="Add a bank" />
+              <ConnectCardButton label="Connect" />
             </>
           ) : undefined
         }
@@ -37,8 +52,8 @@ export function AccountsView({ items, now }: { items: ItemSummary[]; now: number
         <Card>
           <EmptyState
             icon={CreditCardIcon}
-            title="No cards connected"
-            description="Connect a bank to import your credit card transactions."
+            title="Nothing connected yet"
+            description="Connect a credit card or bank account to import its transactions."
             action={<ConnectCardButton />}
           />
         </Card>
@@ -74,10 +89,23 @@ export function AccountsView({ items, now }: { items: ItemSummary[]; now: number
                       .map((c) => (
                         <li
                           key={c.id}
-                          className="flex items-center justify-between gap-2 rounded-md bg-muted/60 py-1 pr-1 pl-3"
+                          className="flex items-center justify-between gap-2 rounded-md bg-muted/60 py-1.5 pr-1 pl-3"
                         >
-                          <span className="truncate">{c.label}</span>
-                          <CardMenu id={c.id} label={c.label} bank={item.institutionName} />
+                          <span className="min-w-0">
+                            <span className="block truncate">{c.label}</span>
+                            <span className="block text-xs text-muted-foreground">{accountKind(c)}</span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1">
+                            {c.balanceCents !== null && (
+                              <span className="tabular text-right text-sm">
+                                {formatCents(c.balanceCents)}
+                                {c.type === "credit" && (
+                                  <span className="block text-[11px] text-muted-foreground">owed</span>
+                                )}
+                              </span>
+                            )}
+                            <CardMenu id={c.id} label={c.label} bank={item.institutionName} />
+                          </span>
                         </li>
                       ))}
                   </ul>
@@ -102,7 +130,7 @@ export function AccountsView({ items, now }: { items: ItemSummary[]; now: number
                   {!status.ok && item.status !== "revoked" ? (
                     <ConnectCardButton itemId={item.id} label="Reconnect" variant="outline" />
                   ) : (
-                    <span />
+                    <ConnectCardButton itemId={item.id} mode="add_accounts" label="Add accounts" variant="ghost" />
                   )}
                   <DisconnectButton itemId={item.id} name={item.institutionName} />
                 </div>
@@ -114,7 +142,8 @@ export function AccountsView({ items, now }: { items: ItemSummary[]; now: number
 
       <p className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
         <LockIcon className="size-3.5" />
-        MoneyFlow never sees your bank password. Access tokens and card names are stored encrypted.
+        MoneyFlow never sees your bank password. Access tokens, account names and balances are stored encrypted. Adding
+        accounts from a bank you&apos;ve already connected doesn&apos;t use another Plaid connection.
       </p>
     </>
   );

@@ -12,6 +12,8 @@ import { allow } from "@/lib/guard";
 import { toCents } from "@/lib/money";
 import { RateLimitError } from "@/lib/rate-limit";
 import { INCOME_FREQUENCIES } from "@/lib/reports/income";
+import { dismissIncomeSuggestion } from "@/lib/income/suggest";
+import { loadUserContext } from "@/lib/user";
 
 export type IncomeActionResult = { ok: true } | { ok: false; error: string };
 
@@ -107,6 +109,15 @@ export async function saveIncomeEntry(input: z.input<typeof EntryInput>): Promis
 export async function deleteIncomeEntry(id: string): Promise<IncomeActionResult> {
   const userId = await requireUser();
   await withUser(userId, (tx) => tx.delete(incomeEntries).where(eq(incomeEntries.id, z.uuid().parse(id))));
+  refresh();
+  return { ok: true };
+}
+
+/** "Not income": stop suggesting this payer. */
+export async function dismissIncomeSuggestionAction(key: string): Promise<IncomeActionResult> {
+  const userId = await requireUser();
+  const k = z.string().regex(/^[0-9a-f]{64}$/).parse(key);
+  await withUser(userId, async (tx) => dismissIncomeSuggestion(tx, (await loadUserContext(tx, userId)).crypto, k));
   refresh();
   return { ok: true };
 }

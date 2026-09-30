@@ -80,6 +80,9 @@ export const accounts = pgTable("accounts", {
   subtype: text("subtype"),
   displayColor: text("display_color"),
   isHidden: boolean("is_hidden").notNull().default(false),
+  /** Current balance from the latest sync, as a decimal string, encrypted. */
+  balanceCt: bytea("balance_ct"),
+  balanceUpdatedAt: timestamp("balance_updated_at", { withTimezone: true }),
 });
 
 // ============ Categories & tags ============

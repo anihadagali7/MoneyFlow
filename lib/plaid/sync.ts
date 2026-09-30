@@ -153,11 +153,16 @@ export async function applySyncUpdates(
 
   // 1. Accounts
   for (const a of updates.accounts) {
+    // Balances come free with each sync (Plaid's cached value); stored encrypted.
+    const balance = a.balances?.current ?? a.balances?.available ?? null;
     const values = {
       nameCt: crypto.encrypt("accounts", "name_ct", a.official_name || a.name),
       maskCt: crypto.encryptOrNull("accounts", "mask_ct", a.mask),
       type: a.type,
       subtype: a.subtype ?? null,
+      ...(balance === null
+        ? {}
+        : { balanceCt: crypto.encrypt("accounts", "balance_ct", balance.toFixed(2)), balanceUpdatedAt: new Date() }),
     };
     await tx
       .insert(accounts)

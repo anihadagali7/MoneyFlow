@@ -83,8 +83,30 @@ const items: ItemSummary[] = [
     status: "active",
     lastSyncedAt: "2026-09-30T07:40:00Z",
     cards: [
-      { id: "card-1", label: "Venture X ••4821", removed: false },
-      { id: "card-2", label: "Quicksilver ••1190", removed: true },
+      {
+        id: "card-1",
+        label: "Venture X ••4821",
+        removed: false,
+        type: "credit",
+        subtype: "credit card",
+        balanceCents: 1284_17,
+      },
+      {
+        id: "chk-1",
+        label: "360 Checking ••0921",
+        removed: false,
+        type: "depository",
+        subtype: "checking",
+        balanceCents: 6420_55,
+      },
+      {
+        id: "card-2",
+        label: "Quicksilver ••1190",
+        removed: true,
+        type: "credit",
+        subtype: "credit card",
+        balanceCents: null,
+      },
     ],
   },
   {
@@ -92,7 +114,16 @@ const items: ItemSummary[] = [
     institutionName: "Chase",
     status: "login_required",
     lastSyncedAt: "2026-09-27T12:00:00Z",
-    cards: [{ id: "card-3", label: "Sapphire Preferred ••7703", removed: false }],
+    cards: [
+      {
+        id: "card-3",
+        label: "Sapphire Preferred ••7703",
+        removed: false,
+        type: "credit",
+        subtype: "credit card",
+        balanceCents: 412_90,
+      },
+    ],
   },
 ];
 
@@ -347,6 +378,17 @@ export const fixtures = {
       { id: "e2", label: "Tax refund", amountCents: 842_00, receivedOn: "2026-04-02" },
     ],
     monthlyRecurringCents: 6200_00,
+    suggestions: [
+      {
+        key: "a".repeat(64),
+        name: "ACME CORP PAYROLL",
+        frequency: "biweekly",
+        frequencyLabel: "Every 2 weeks",
+        amountCents: 2861_54,
+        monthlyCents: 6200_00,
+        lastDate: "2026-09-26",
+      },
+    ],
   } satisfies IncomeData,
   items,
 };

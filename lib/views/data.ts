@@ -21,7 +21,16 @@ export type ItemSummary = {
   institutionName: string;
   status: string;
   lastSyncedAt: string | null;
-  cards: Array<{ id: string; label: string; removed: boolean }>;
+  cards: Array<AccountSummary>;
+};
+export type AccountSummary = {
+  id: string;
+  label: string;
+  removed: boolean;
+  type: string; // credit | depository
+  subtype: string | null;
+  /** Latest balance: amount owed for cards, money in the account for checking/savings. */
+  balanceCents: number | null;
 };
 export type TxnRow = {
   id: string;
@@ -39,12 +48,15 @@ export type TxnRow = {
 };
 export type CategoryRef = { id: string; slug: string; name: string };
 
-async function loadCards(tx: Tx, crypto: UserCrypto): Promise<Array<CardRef & { itemId: string; removed: boolean }>> {
+async function loadCards(tx: Tx, crypto: UserCrypto): Promise<Array<AccountSummary & { itemId: string }>> {
   const rows = await tx.select().from(accounts);
   return rows.map((a) => ({
     id: a.id,
     itemId: a.itemId,
     removed: a.isHidden,
+    type: a.type,
+    subtype: a.subtype,
+    balanceCents: a.balanceCt ? Math.round(Number(crypto.decrypt("accounts", "balance_ct", a.balanceCt)) * 100) : null,
     label: `${crypto.decrypt("accounts", "name_ct", a.nameCt)}${a.maskCt ? ` ••${crypto.decrypt("accounts", "mask_ct", a.maskCt)}` : ""}`,
   }));
 }
@@ -56,7 +68,9 @@ export async function loadItems(tx: Tx, crypto: UserCrypto): Promise<ItemSummary
     institutionName: i.institutionName ?? "Card",
     status: i.status,
     lastSyncedAt: i.lastSyncedAt?.toISOString() ?? null,
-    cards: cards.filter((c) => c.itemId === i.id).map((c) => ({ id: c.id, label: c.label, removed: c.removed })),
+    cards: cards
+      .filter((c) => c.itemId === i.id)
+      .map((c) => ({ id: c.id, label: c.label, removed: c.removed, type: c.type, subtype: c.subtype, balanceCents: c.balanceCents })),
   }));
 }
 

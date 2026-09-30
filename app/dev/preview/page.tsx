@@ -55,7 +55,7 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     income: { href: "/income", node: <IncomeView data={f.income} today={f.today} /> },
     "income-empty": {
       href: "/income",
-      node: <IncomeView data={{ sources: [], entries: [], monthlyRecurringCents: 0 }} today={f.today} />,
+      node: <IncomeView data={{ sources: [], entries: [], monthlyRecurringCents: 0, suggestions: [] }} today={f.today} />,
     },
     accounts: { href: "/accounts", node: <AccountsView items={f.items} now={f.now} /> },
     settings: {

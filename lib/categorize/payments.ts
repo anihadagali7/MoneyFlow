@@ -12,6 +12,13 @@ const PAYMENT_WORDS =
   /\b(payment|pymt|pmt|autopay|auto[\s-]?pay|thank\s*you|e-?payment|epay|online\s+(?:pmt|payment)|mobile\s+(?:pmt|payment)|ach\s+(?:pmt|payment|credit))\b/i;
 const NOT_PAYMENT = /\b(refund|return|reversal|cash\s*back|reward|statement\s+credit|dispute)\b/i;
 
+/** The checking-account side of paying a card: money out to a card issuer. */
+const CARD_PAYMENT_OUT =
+  /\b(credit\s*c(?:ar)?d|crd|card|cc)\s*(?:payment|pymt|pmt|autopay|auto\s*pay|epay)\b|\b(capital\s*one|chase|amex|american\s*express|citi(?:bank|card)?|discover|barclay(?:s|card)?|synchrony|bk\s*of\s*amer(?:ica)?|bank\s*of\s*america|wells\s*fargo\s*card|apple\s*card|gs\s*bank)\b.{0,24}\b(payment|pymt|pmt|autopay|auto\s*pay|epay|online\s*pmt)\b/i;
+
+/** Plaid's codes for moving money between the user's own accounts. */
+const OWN_TRANSFER = /^TRANSFER_(IN|OUT)_(ACCOUNT_TRANSFER|SAVINGS|INVESTMENT_AND_RETIREMENT_FUNDS)/;
+
 export type PaymentSignals = {
   amountCents: number;
   accountType: string | null; // Plaid account type: credit, depository, ...
@@ -21,9 +28,17 @@ export type PaymentSignals = {
   merchantName: string | null;
 };
 
+/**
+ * True for money moving between the user's own accounts: card payments (either side) and
+ * transfers like checking → savings. These are never spending or income.
+ */
 export function isCardPayment(t: PaymentSignals): boolean {
-  // Plaid's own label is decisive either way round (e.g. the checking-account side, if linked).
-  if (t.pfcDetailed && /CREDIT_CARD_PAYMENT/.test(t.pfcDetailed)) return true;
+  // Plaid's own label is decisive either way round.
+  if (t.pfcDetailed && (/CREDIT_CARD_PAYMENT/.test(t.pfcDetailed) || OWN_TRANSFER.test(t.pfcDetailed))) return true;
+  if (t.accountType === "depository") {
+    // Checking side: money going out to a card issuer.
+    return t.amountCents > 0 && (CARD_PAYMENT_OUT.test(t.description) || CARD_PAYMENT_OUT.test(t.merchantName ?? ""));
+  }
   if (t.accountType !== "credit" || t.amountCents >= 0) return false;
   if (NOT_PAYMENT.test(t.description)) return false;
   if (t.pfcPrimary === "TRANSFER_IN" || t.pfcPrimary === "LOAN_PAYMENTS") return true;
@@ -57,7 +72,12 @@ export async function reclassifyCardPayments(tx: Tx, crypto: UserCrypto): Promis
     .innerJoin(accounts, eq(accounts.id, transactions.accountId))
     .where(
       and(
-        or(lt(transactions.amountCents, 0), sql`${transactions.plaidPfcDetailed} like '%CREDIT_CARD_PAYMENT%'`),
+        or(
+          lt(transactions.amountCents, 0),
+          eq(accounts.type, "depository"),
+          sql`${transactions.plaidPfcDetailed} like '%CREDIT_CARD_PAYMENT%'`,
+          sql`${transactions.plaidPfcDetailed} like 'TRANSFER_%'`,
+        ),
         or(isNull(transactions.categoryId), ne(transactions.categoryId, transfer.id)),
         or(isNull(transactions.categorySource), ne(transactions.categorySource, "user")),
       ),

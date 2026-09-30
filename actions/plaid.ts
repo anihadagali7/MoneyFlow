@@ -3,7 +3,7 @@
 import { eq } from "drizzle-orm";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
-import { CountryCode, CreditAccountSubtype, Products } from "plaid";
+import { CountryCode, CreditAccountSubtype, DepositoryAccountSubtype, Products } from "plaid";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { allow } from "@/lib/guard";
@@ -28,8 +28,12 @@ async function plaidCall<T>(fn: () => Promise<{ data: T }>): Promise<{ data: T |
 
 type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
-/** Creates a Plaid Link token. Pass itemId to reconnect an existing Item (update mode). */
-export async function createLinkToken(itemId?: string): Promise<ActionResult<string>> {
+/**
+ * Creates a Plaid Link token. With itemId, opens update mode for that bank: "reconnect"
+ * re-authenticates, "add_accounts" lets the user pick more accounts (e.g. checking at the
+ * same bank as a card) without creating, or paying for, another connection.
+ */
+export async function createLinkToken(itemId?: string, mode: "reconnect" | "add_accounts" = "reconnect"): Promise<ActionResult<string>> {
   const userId = await requireUser();
   if (!(await allow(userId, "plaid.link"))) return { ok: false, error: new RateLimitError().message };
   let accessToken: string | undefined;
@@ -50,13 +54,14 @@ export async function createLinkToken(itemId?: string): Promise<ActionResult<str
     country_codes: [CountryCode.Us],
     webhook: process.env.PLAID_WEBHOOK_URL || undefined,
     ...(accessToken
-      ? { access_token: accessToken }
+      ? { access_token: accessToken, ...(mode === "add_accounts" ? { update: { account_selection_enabled: true } } : {}) }
       : {
           products: [Products.Transactions],
           transactions: { days_requested: 730 },
           account_filters: {
             // "all" covers credit and charge cards; Plaid rejects "charge card" as a filter value.
             credit: { account_subtypes: [CreditAccountSubtype.All] },
+            depository: { account_subtypes: [DepositoryAccountSubtype.Checking, DepositoryAccountSubtype.Savings] },
           },
         }),
   }));
@@ -79,7 +84,12 @@ export async function exchangePublicToken(input: z.infer<typeof ExchangeInput>):
     const existing = await withUser(userId, (tx) =>
       tx.select({ id: plaidItems.id }).from(plaidItems).where(eq(plaidItems.institutionId, institution.id!)),
     );
-    if (existing.length) return { ok: false, error: `${institution.name ?? "This bank"} is already connected.` };
+    if (existing.length) {
+      return {
+        ok: false,
+        error: `${institution.name ?? "This bank"} is already connected. To add more accounts from it, use Add accounts on the Accounts page. That doesn't use another Plaid connection.`,
+      };
+    }
   }
 
   const { data } = await plaidCall(() => getPlaid().itemPublicTokenExchange({ public_token: publicToken }));
