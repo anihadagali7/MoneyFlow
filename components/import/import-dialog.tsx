@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { FileUpIcon } from "lucide-react";
-import { toast } from "sonner";
+import Link from "next/link";
+import { AlertCircleIcon, CheckCircle2Icon, FileUpIcon, Loader2Icon } from "lucide-react";
 import { importCsv, previewCsvImport, type PreviewResult } from "@/actions/import";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -28,14 +28,16 @@ export function ImportDialog({
   open,
   onOpenChange,
   initialPreview = null,
+  initialDone = null,
 }: {
   accountId: string;
   label: string;
   bank: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Only for the dev preview page, to review the preview step's layout. */
+  /** Only for the dev preview page, to review the preview and result steps' layout. */
   initialPreview?: Preview | null;
+  initialDone?: { imported: number; from: string; to: string; fileName: string | null } | null;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [text, setText] = useState<string | null>(null);
@@ -44,6 +46,47 @@ export function ImportDialog({
   const [preview, setPreview] = useState<Preview | null>(initialPreview);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [importing, setImporting] = useState(false);
+  const [done, setDone] = useState<{ imported: number; from: string; to: string; fileName: string | null } | null>(
+    initialDone,
+  );
+
+  const range = (from: string, to: string) =>
+    `${shortDate(from)}, ${from.slice(0, 4)} – ${shortDate(to)}, ${to.slice(0, 4)}`;
+
+  // Start fresh each time it opens (not on close, which would flash the first step as it slides away).
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open && done) reset();
+  }
+
+  function reset() {
+    setPreview(null);
+    setFileName(null);
+    setText(null);
+    setDone(null);
+    setError(null);
+  }
+
+  function runImport(p: Preview) {
+    setError(null);
+    setImporting(true);
+    startTransition(async () => {
+      try {
+        const result = await importCsv(accountId, text!, flip);
+        if (!result.ok) return setError(result.error);
+        setDone({ imported: result.imported, from: p.from, to: p.to, fileName });
+        setPreview(null);
+      } catch {
+        setError(
+          "Couldn't confirm the import finished. Check this account on the Accounts page; importing the same file again won't add duplicates.",
+        );
+      } finally {
+        setImporting(false);
+      }
+    });
+  }
 
   function load(content: string, flipSign: boolean) {
     setError(null);
@@ -58,7 +101,13 @@ export function ImportDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (importing) return; // don't lose track of an import mid-way
+        onOpenChange(next);
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Import older transactions</DialogTitle>
@@ -68,7 +117,24 @@ export function ImportDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {!preview && (
+        {done && (
+          <div className="flex flex-col items-center gap-2 rounded-xl bg-muted/60 p-5 text-center text-sm">
+            <CheckCircle2Icon className="size-8 text-status-good" />
+            <div className="text-lg font-semibold">
+              Imported {done.imported} transaction{done.imported === 1 ? "" : "s"}
+            </div>
+            <div className="text-muted-foreground">
+              {done.fileName && <span className="block break-all">{done.fileName}</span>}
+              {range(done.from, done.to)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Categories are being filled in now and usually finish within a minute. The Accounts page shows the
+              progress.
+            </p>
+          </div>
+        )}
+
+        {!preview && !done && (
           <div className="grid grid-cols-[minmax(0,1fr)] gap-3 text-sm">
             <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
               <li>On {bank}&apos;s website, open this account&apos;s transactions.</li>
@@ -104,8 +170,7 @@ export function ImportDialog({
               </div>
               {preview.newCount > 0 && (
                 <div className="mt-1 text-muted-foreground">
-                  {shortDate(preview.from)}, {preview.from.slice(0, 4)} – {shortDate(preview.to)},{" "}
-                  {preview.to.slice(0, 4)} · {formatCents(preview.spentCents)} spent
+                  {range(preview.from, preview.to)} · {formatCents(preview.spentCents)} spent
                 </div>
               )}
               <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
@@ -155,37 +220,46 @@ export function ImportDialog({
           </div>
         )}
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {importing && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+            <Loader2Icon className="size-4 shrink-0 animate-spin" />
+            Importing {preview?.newCount} transactions. Keep this open, it takes a few seconds.
+          </p>
+        )}
+
+        {error && (
+          <p className="flex gap-2 rounded-xl bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+            <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
+            {error}
+          </p>
+        )}
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (preview) {
-                setPreview(null);
-                setFileName(null);
-                setText(null);
-              } else onOpenChange(false);
-            }}
-          >
-            {preview ? "Choose another file" : "Cancel"}
-          </Button>
-          {preview && (
-            <Button
-              disabled={pending || preview.newCount === 0}
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await importCsv(accountId, text!, flip);
-                  if (!result.ok) return setError(result.error);
-                  toast.success(`Imported ${result.imported} transaction${result.imported === 1 ? "" : "s"}`, {
-                    description: "Categorizing them now. Refresh in a minute.",
-                  });
-                  onOpenChange(false);
-                })
-              }
-            >
-              {pending ? "Importing…" : `Import ${preview.newCount}`}
-            </Button>
+          {done ? (
+            <>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Done
+              </Button>
+              <Link
+                href={`/transactions?card=${accountId}&month=${done.to.slice(0, 7)}`}
+                className={buttonVariants()}
+                onClick={() => onOpenChange(false)}
+              >
+                View transactions
+              </Link>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" disabled={importing} onClick={() => (preview ? reset() : onOpenChange(false))}>
+                {preview ? "Choose another file" : "Cancel"}
+              </Button>
+              {preview && (
+                <Button disabled={pending || preview.newCount === 0} onClick={() => runImport(preview)}>
+                  {importing && <Loader2Icon className="animate-spin" />}
+                  {importing ? "Importing…" : `Import ${preview.newCount}`}
+                </Button>
+              )}
+            </>
           )}
         </DialogFooter>
       </DialogContent>

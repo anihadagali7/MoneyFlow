@@ -8,37 +8,44 @@ import { TransactionFiltersBar } from "@/components/transactions/filters";
 import { TxnList } from "@/components/transactions/txn-list";
 import { TxnMenu } from "@/components/transactions/txn-menu";
 import { buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCents } from "@/lib/money";
-import type { TransactionsData } from "@/lib/views/data";
+import { TXN_RANGE_LABEL, TXN_RANGES, type TransactionsData } from "@/lib/views/data";
+import { BarList } from "@/components/charts/bar-list";
+import { SegmentedLinks } from "@/components/segmented-links";
 
 export function TransactionsView({ data, today }: { data: TransactionsData; today: string }) {
-  const monthHref = (month: string) => {
+  const href = (overrides: Partial<Record<keyof TransactionsData["filters"], string | undefined>>) => {
     const next = new URLSearchParams();
-    for (const [k, v] of Object.entries({ ...data.filters, month })) if (v) next.set(k, v);
+    for (const [k, v] of Object.entries({ ...data.filters, ...overrides })) if (v) next.set(k, v);
     return `/transactions?${next.toString()}`;
   };
   const options = data.categories.map((c) => ({ id: c.id, name: c.name }));
   const hasFilters = Boolean(data.filters.q || data.filters.category || data.filters.card || data.filters.review);
+  const categoryName =
+    data.filters.category === "uncategorized"
+      ? "Uncategorized"
+      : data.categories.find((c) => c.slug === data.filters.category)?.name;
+  const count = `${data.rows.length}${data.truncated ? "+" : ""} transaction${data.rows.length === 1 ? "" : "s"}`;
+  const perMonth =
+    data.monthCount > 1 ? ` · ≈ ${formatCents(Math.round(data.totals.outCents / data.monthCount))}/mo` : "";
 
   return (
     <>
       <PageHeader
-        title="Transactions"
+        title={categoryName ?? "Transactions"}
         description={
           <>
-            {data.searching && "All months · "}
-            {data.rows.length}
-            {data.truncated && "+"} transaction{data.rows.length === 1 ? "" : "s"} · {formatCents(data.totals.outCents)}{" "}
-            spent
+            {data.searching ? "All months" : data.rangeLabel} · {count} · {formatCents(data.totals.outCents)} spent
+            {perMonth}
             {data.totals.inCents > 0 && ` · ${formatCents(data.totals.inCents)} refunds & credits`}
           </>
         }
         actions={
-          data.searching ? undefined : (
+          !data.searching && data.range === "month" ? (
             <div className="flex items-center gap-1">
               <Link
-                href={monthHref(data.prevMonthKey)}
+                href={href({ month: data.prevMonthKey })}
                 className={buttonVariants({ variant: "outline", size: "icon" })}
                 aria-label="Previous month"
               >
@@ -46,16 +53,52 @@ export function TransactionsView({ data, today }: { data: TransactionsData; toda
               </Link>
               <span className="min-w-36 text-center text-sm font-medium">{data.monthName}</span>
               <Link
-                href={monthHref(data.nextMonthKey)}
+                href={href({ month: data.nextMonthKey })}
                 className={buttonVariants({ variant: "outline", size: "icon" })}
                 aria-label="Next month"
               >
                 <ChevronRightIcon />
               </Link>
             </div>
-          )
+          ) : undefined
         }
       />
+
+      {!data.searching && (
+        <div className="-mx-4 mb-3 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
+          <SegmentedLinks
+            active={data.range}
+            items={TXN_RANGES.map((r) => ({
+              key: r,
+              label: TXN_RANGE_LABEL[r],
+              // Month keeps the month you were looking at; other periods end today.
+              href: href({ range: r === "month" ? undefined : r, month: r === "month" ? data.monthKey : undefined }),
+            }))}
+          />
+        </div>
+      )}
+
+      {data.byMonth && data.rows.length > 0 && (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>{categoryName ? `${categoryName} by month` : "Spending by month"}</CardTitle>
+            <CardDescription>Refunds are netted out</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BarList
+              items={[...data.byMonth]
+                .reverse()
+                .map((m) => ({
+                  key: m.key,
+                  label: m.label,
+                  cents: m.cents,
+                  href: href({ range: undefined, month: m.key }),
+                }))}
+              empty="Nothing in this period."
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mb-4">
         <TransactionFiltersBar filters={data.filters} categories={data.categories} cards={data.cards} />
@@ -75,7 +118,10 @@ export function TransactionsView({ data, today }: { data: TransactionsData; toda
             }
             action={
               hasFilters ? (
-                <Link href={`/transactions?month=${data.monthKey}`} className={buttonVariants({ variant: "outline" })}>
+                <Link
+                  href={href({ q: undefined, category: undefined, card: undefined, review: undefined })}
+                  className={buttonVariants({ variant: "outline" })}
+                >
                   Clear filters
                 </Link>
               ) : undefined

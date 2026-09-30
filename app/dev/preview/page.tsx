@@ -95,14 +95,49 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     empty: { href: "/dashboard", node: <DashboardView data={{ ...f.dashboard, items: [] }} today={f.today} /> },
     transactions: { href: "/transactions", node: <TransactionsView data={f.transactions} today={f.today} /> },
     reports: { href: "/reports", node: <ReportsView data={f.reports} /> },
+    "transactions-category-6m": {
+      href: "/transactions",
+      node: (
+        <TransactionsView
+          data={{
+            ...f.transactions,
+            filters: { category: "groceries", range: "6m" },
+            range: "6m",
+            rangeLabel: "Last 6 months",
+            monthCount: 6,
+            rows: f.transactions.rows.filter((r) => r.categoryName === "Groceries"),
+            totals: { outCents: 4820_11, inCents: 12_40 },
+            byMonth: f.reports.months.map((m, i) => ({ key: m.key, label: m.label, cents: 700_00 + i * 45_13 })),
+          }}
+          today={f.today}
+        />
+      ),
+    },
     income: { href: "/income", node: <IncomeView data={f.income} today={f.today} /> },
     "income-empty": {
       href: "/income",
-      node: (
-        <IncomeView data={{ sources: [], entries: [], monthlyRecurringCents: 0 }} today={f.today} />
-      ),
+      node: <IncomeView data={{ sources: [], entries: [], monthlyRecurringCents: 0 }} today={f.today} />,
     },
     accounts: { href: "/accounts", node: <AccountsView items={f.items} now={f.now} /> },
+    "import-done": {
+      href: "/accounts",
+      node: (
+        <>
+          <AccountsView items={f.items} now={f.now} />
+          <ImportPreviewDemo
+            accountId="chk-1"
+            label="TOTAL CHECKING ••9975"
+            bank="Chase"
+            initialDone={{
+              imported: 262,
+              from: "2025-01-02",
+              to: "2025-06-29",
+              fileName: "Chase9975_Activity_20250630.CSV",
+            }}
+          />
+        </>
+      ),
+    },
     "import-preview": {
       href: "/accounts",
       node: (

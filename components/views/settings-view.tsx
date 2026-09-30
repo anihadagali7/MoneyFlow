@@ -12,7 +12,7 @@ export type SettingsData = {
   timezone: string;
   customCategories: CustomCategory[];
   categoryOptions: Array<{ id: string; name: string }>;
-  activity: Array<{ id: number; action: string; createdAt: string }>;
+  activity: Array<{ id: number; action: string; detail?: string | null; createdAt: string }>;
 };
 
 const ACTION_LABEL: Record<string, string> = {
@@ -95,7 +95,10 @@ export function SettingsView({ data, now }: { data: SettingsData; now: number })
               <ul className="divide-y text-sm">
                 {data.activity.map((a) => (
                   <li key={a.id} className="flex items-center justify-between gap-3 py-2.5">
-                    <span>{ACTION_LABEL[a.action] ?? a.action}</span>
+                    <span className="min-w-0">
+                      {ACTION_LABEL[a.action] ?? a.action}
+                      {a.detail && <span className="block text-xs text-muted-foreground">{a.detail}</span>}
+                    </span>
                     <span className="shrink-0 text-xs text-muted-foreground">{relativeTime(a.createdAt, now)}</span>
                   </li>
                 ))}

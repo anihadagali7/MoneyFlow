@@ -2,10 +2,11 @@ import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { runAsUser, type Db } from "@/lib/db/core";
-import { accounts, categories, transactions } from "@/lib/db/schema";
+import { accounts, auditLog, categories, transactions } from "@/lib/db/schema";
 import { parseTransactionsCsv } from "@/lib/import/csv";
 import { applyImport, previewImport } from "@/lib/import";
 import { syncItem } from "@/lib/plaid/sync";
+import { loadItems } from "@/lib/views/data";
 import { page, plaidTxn, provider, runner, seedUserWithItem } from "../helpers/fixtures";
 import { createTestDb } from "../helpers/testDb";
 
@@ -75,6 +76,17 @@ describe("CSV import", () => {
     expect(all.filter((r) => r.amount === 6_75)).toHaveLength(2);
     expect(all.find((r) => r.amount === -1250_00)?.slug).toBe("payments_transfers");
     expect(all.every((r) => !r.desc.toString("utf8").includes("NETFLIX"))).toBe(true); // encrypted
+  });
+
+  it("shows what was imported per account, and records the account and dates", async () => {
+    const before = await runAsUser(db, U, async (tx) => loadItems(tx, await loadUserCrypto(tx, provider, U)));
+    expect(before[0].cards[0].imported).toBeNull();
+    await doImport();
+    const after = await runAsUser(db, U, async (tx) => loadItems(tx, await loadUserCrypto(tx, provider, U)));
+    // The payment was labelled on the way in; the other 3 wait for the categorizer.
+    expect(after[0].cards[0].imported).toEqual({ count: 4, from: "2026-03-05", to: "2026-06-03", categorizing: 3 });
+    const [log] = await runAsUser(db, U, (tx) => tx.select().from(auditLog).where(eq(auditLog.action, "import")));
+    expect(log.meta).toEqual({ rows: 4, accountId, from: "2026-03-05", to: "2026-06-03" });
   });
 
   it("refuses another user's account", async () => {

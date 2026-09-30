@@ -114,7 +114,7 @@ export function ReportsView({ data }: { data: ReportData }) {
                 label: c.name,
                 cents: c.cents,
                 detail: `${c.count} transaction${c.count === 1 ? "" : "s"}`,
-                href: `/transactions?category=${c.slug}`,
+                href: `/transactions?category=${c.slug}&range=${data.range}`,
               }))}
             />
           </CardContent>
@@ -132,7 +132,7 @@ export function ReportsView({ data }: { data: ReportData }) {
                   key: c.id,
                   label: c.label,
                   cents: c.cents,
-                  href: `/transactions?card=${c.id}`,
+                  href: `/transactions?card=${c.id}&range=${data.range}`,
                 }))}
               />
             </CardContent>

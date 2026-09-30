@@ -158,6 +158,11 @@ export async function applyImport(tx: Tx, crypto: UserCrypto, accountId: string,
     inserted += res.length;
   }
   await applyMerchantCategories(tx, crypto.userId);
-  await tx.insert(auditLog).values({ userId: crypto.userId, action: "import", meta: { rows: inserted } });
+  const dates = newRows.map((r) => r.date).sort();
+  await tx.insert(auditLog).values({
+    userId: crypto.userId,
+    action: "import",
+    meta: { rows: inserted, accountId, from: dates[0] ?? null, to: dates.at(-1) ?? null },
+  });
   return inserted;
 }

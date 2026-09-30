@@ -124,6 +124,7 @@ const items: ItemSummary[] = [
         type: "credit",
         subtype: "credit card",
         balanceCents: 412_90,
+        imported: { count: 312, from: "2025-01-02", to: "2025-06-29", categorizing: 40 },
       },
     ],
   },
@@ -362,6 +363,10 @@ export const fixtures = {
     totals: { outCents: 682_67, inCents: 38_99 },
     searching: false,
     truncated: false,
+    range: "month",
+    rangeLabel: "September 2026",
+    byMonth: null,
+    monthCount: 1,
   } satisfies TransactionsData,
   reports: {
     range: "6m",

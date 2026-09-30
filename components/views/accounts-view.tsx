@@ -1,4 +1,12 @@
-import { AlertTriangleIcon, CheckCircle2Icon, CreditCardIcon, LockIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  CheckCircle2Icon,
+  CreditCardIcon,
+  FileCheckIcon,
+  Loader2Icon,
+  LockIcon,
+} from "lucide-react";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { ConnectCardButton } from "@/components/plaid/connect-card-button";
@@ -31,8 +39,10 @@ export function AccountsView({ items, now }: { items: ItemSummary[]; now: number
     .filter((c) => !c.removed && c.type === "depository" && c.balanceCents !== null)
     .reduce((a, c) => a + c.balanceCents!, 0);
   const hasBank = items.some((i) => i.cards.some((c) => c.type === "depository" && !c.removed));
+  const categorizing = items.some((i) => i.cards.some((c) => (c.imported?.categorizing ?? 0) > 0));
   return (
     <>
+      {categorizing && <AutoRefresh />}
       <PageHeader
         title="Accounts"
         description={
@@ -94,6 +104,7 @@ export function AccountsView({ items, now }: { items: ItemSummary[]; now: number
                           <span className="min-w-0">
                             <span className="block truncate">{c.label}</span>
                             <span className="block text-xs text-muted-foreground">{accountKind(c)}</span>
+                            {c.imported && <ImportedLine imported={c.imported} />}
                           </span>
                           <span className="flex shrink-0 items-center gap-1">
                             {c.balanceCents !== null && (
@@ -146,5 +157,32 @@ export function AccountsView({ items, now }: { items: ItemSummary[]; now: number
         accounts from a bank you&apos;ve already connected doesn&apos;t use another Plaid connection.
       </p>
     </>
+  );
+}
+
+/** "Jan – Jun 2025", or "Nov 2024 – Feb 2025" across years. */
+function monthSpan(from: string, to: string) {
+  const fmt = (d: string, year: boolean) =>
+    new Date(`${d}T00:00:00Z`).toLocaleDateString("en-US", {
+      month: "short",
+      year: year ? "numeric" : undefined,
+      timeZone: "UTC",
+    });
+  return `${fmt(from, from.slice(0, 4) !== to.slice(0, 4))} – ${fmt(to, true)}`;
+}
+
+/** "312 imported · Jan – Jun 2025", with a note while categories are still being filled in. */
+function ImportedLine({ imported }: { imported: NonNullable<AccountSummary["imported"]> }) {
+  return (
+    <span className="block text-xs text-muted-foreground">
+      <FileCheckIcon className="mr-1 inline size-3 align-[-2px]" />
+      {imported.count} imported · {monthSpan(imported.from, imported.to)}
+      {imported.categorizing > 0 && (
+        <span className="block">
+          <Loader2Icon className="mr-1 inline size-3 animate-spin align-[-2px]" />
+          Categorizing {imported.categorizing}…
+        </span>
+      )}
+    </span>
   );
 }

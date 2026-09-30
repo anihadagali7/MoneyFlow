@@ -1,12 +1,14 @@
-import { and, asc, count, desc, eq, gte, isNull, lt, ne, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNull, like, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import type { UserCrypto } from "@/lib/crypto/userCrypto";
 import type { Tx } from "@/lib/db/core";
 import { accounts, categories, plaidItems, transactions } from "@/lib/db/schema";
-import { formatMonth, monthRange, parseMonth, shiftMonth } from "@/lib/reports/spend";
+import { formatMonth, monthRange, parseMonth, shiftMonth, type Month } from "@/lib/reports/spend";
 import type { Today } from "@/lib/time";
 import {
   loadIncomeByMonth,
   monthLabel,
+  RANGE_LABEL,
+  resolveRange,
   spendByCategory,
   spendByMonth,
   type MonthRow,
@@ -31,6 +33,8 @@ export type AccountSummary = {
   subtype: string | null;
   /** Latest balance: amount owed for cards, money in the account for checking/savings. */
   balanceCents: number | null;
+  /** History added from CSV files; `categorizing` rows are still waiting for a category. */
+  imported?: { count: number; from: string; to: string; categorizing: number } | null;
 };
 export type TxnRow = {
   id: string;
@@ -61,10 +65,27 @@ async function loadCards(tx: Tx, crypto: UserCrypto): Promise<Array<AccountSumma
   }));
 }
 
+/** What's been imported from files, per account. Imported rows have `import:` ids. */
+async function loadImportSummaries(tx: Tx) {
+  const rows = await tx
+    .select({
+      accountId: transactions.accountId,
+      count: sql<number>`count(*)::int`,
+      from: sql<string>`min(${transactions.date})::text`,
+      to: sql<string>`max(${transactions.date})::text`,
+      categorizing: sql<number>`(count(*) filter (where ${transactions.categoryId} is null))::int`,
+    })
+    .from(transactions)
+    .where(like(transactions.plaidTransactionId, "import:%"))
+    .groupBy(transactions.accountId);
+  return new Map(rows.map(({ accountId, ...r }) => [accountId, r]));
+}
+
 export async function loadItems(tx: Tx, crypto: UserCrypto): Promise<ItemSummary[]> {
-  const [items, cards] = await Promise.all([
+  const [items, cards, imports] = await Promise.all([
     tx.select().from(plaidItems).orderBy(plaidItems.createdAt),
     loadCards(tx, crypto),
+    loadImportSummaries(tx),
   ]);
   return items.map((i) => ({
     id: i.id,
@@ -80,6 +101,7 @@ export async function loadItems(tx: Tx, crypto: UserCrypto): Promise<ItemSummary
         type: c.type,
         subtype: c.subtype,
         balanceCents: c.balanceCents,
+        imported: imports.get(c.id) ?? null,
       })),
   }));
 }
@@ -192,7 +214,38 @@ export async function loadDashboard(tx: Tx, crypto: UserCrypto, today: Today): P
 
 // ---------- Transactions ----------
 
-export type TransactionFilters = { month?: string; category?: string; card?: string; review?: string; q?: string };
+export const TXN_RANGES = ["week", "month", "3m", "6m", "12m", "ytd"] as const;
+export type TxnRange = (typeof TXN_RANGES)[number];
+export const TXN_RANGE_LABEL: Record<TxnRange, string> = {
+  week: "Week",
+  month: "Month",
+  "3m": "3M",
+  "6m": "6M",
+  "12m": "Year",
+  ytd: "YTD",
+};
+
+export type TransactionFilters = {
+  month?: string;
+  range?: string;
+  category?: string;
+  card?: string;
+  review?: string;
+  q?: string;
+};
+
+/** The dates a period covers. "month" is the selected calendar month; the rest end today. */
+export function resolveTxnRange(range: TxnRange, month: Month, today: Today) {
+  if (range === "week") {
+    return { from: shiftDaysIso(today.iso, -6), to: shiftDaysIso(today.iso, 1), label: "Last 7 days", months: null };
+  }
+  if (range === "month") return { ...monthRange(month), label: monthLabel(month, "long"), months: null };
+  const r = resolveRange(range, today.month);
+  return { from: r.from, to: r.to, label: RANGE_LABEL[range], months: r.months };
+}
+
+const shiftDaysIso = (d: string, days: number) =>
+  new Date(Date.parse(`${d}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 export type TransactionsData = {
   monthKey: string;
   monthName: string;
@@ -203,6 +256,12 @@ export type TransactionsData = {
   cards: CardRef[];
   rows: TxnRow[];
   totals: { outCents: number; inCents: number };
+  range: TxnRange;
+  rangeLabel: string;
+  /** Net spending per month for multi-month periods (refunds netted, transfers excluded). */
+  byMonth: Array<{ key: string; label: string; cents: number }> | null;
+  /** How many months the period spans, for a per-month average. */
+  monthCount: number;
   /** Searching covers all months (up to 2 years), not just the selected one. */
   searching: boolean;
   /** More matches exist than are shown. */
@@ -211,6 +270,7 @@ export type TransactionsData = {
 
 const SEARCH_MONTHS = 24;
 const SEARCH_SCAN_LIMIT = 10_000;
+const PAGE_LIMIT = 1000;
 const SEARCH_RESULT_LIMIT = 500;
 
 /**
@@ -232,13 +292,16 @@ export async function loadTransactions(
   today: Today,
 ): Promise<TransactionsData> {
   const month = parseMonth(filters.month, today.month);
-  const { from, to } = monthRange(month);
+  const range: TxnRange = (TXN_RANGES as readonly string[]).includes(filters.range ?? "")
+    ? (filters.range as TxnRange)
+    : "month";
+  const period = resolveTxnRange(range, month, today);
   const q = filters.q?.trim() ?? "";
   const searching = q.length > 0;
-  // Search looks across all months; otherwise show the selected month.
+  // Search looks across all months; otherwise show the selected period.
   const where: SQL[] = searching
     ? [gte(transactions.date, monthRange(shiftMonth(today.month, -SEARCH_MONTHS)).from)]
-    : [gte(transactions.date, from), lt(transactions.date, to)];
+    : [gte(transactions.date, period.from), lt(transactions.date, period.to)];
   if (filters.review === "1") where.push(eq(transactions.needsReview, true));
   if (filters.card) where.push(eq(transactions.accountId, filters.card));
   if (filters.category === "uncategorized") where.push(isNull(transactions.categoryId));
@@ -250,8 +313,37 @@ export async function loadTransactions(
       .from(categories)
       .orderBy(asc(categories.name)),
     loadCards(tx, crypto),
-    loadTxnRows(tx, crypto, and(...where), searching ? SEARCH_SCAN_LIMIT : 1000),
+    loadTxnRows(tx, crypto, and(...where), searching ? SEARCH_SCAN_LIMIT : PAGE_LIMIT),
   ]);
+
+  // Totals come from the database so long periods are exact even when only some rows are shown.
+  const notTransfer = or(isNull(categories.kind), ne(categories.kind, "transfer"));
+  const monthKey = sql<string>`to_char(${transactions.date}, 'YYYY-MM')`;
+  const [[agg], monthly] = searching
+    ? [[null], []]
+    : await Promise.all([
+        tx
+          .select({
+            count: count(),
+            out: sql<number>`coalesce(sum(case when ${transactions.amountCents} > 0 and (${notTransfer}) then ${transactions.amountCents} end), 0)`.mapWith(
+              Number,
+            ),
+            in: sql<number>`coalesce(sum(case when ${transactions.amountCents} < 0 and (${notTransfer}) then -${transactions.amountCents} end), 0)`.mapWith(
+              Number,
+            ),
+          })
+          .from(transactions)
+          .leftJoin(categories, eq(categories.id, transactions.categoryId))
+          .where(and(...where)),
+        period.months
+          ? tx
+              .select({ key: monthKey, cents: sql<number>`sum(${transactions.amountCents})`.mapWith(Number) })
+              .from(transactions)
+              .leftJoin(categories, eq(categories.id, transactions.categoryId))
+              .where(and(...where, notTransfer))
+              .groupBy(monthKey)
+          : Promise.resolve([]),
+      ]);
 
   // Search runs after decryption; merchant names aren't stored in plaintext.
   const matched = searching ? rows.filter((r) => matchesSearch(r, q)) : rows;
@@ -267,11 +359,22 @@ export async function loadTransactions(
     cards: cards.filter((c) => !c.removed).map(({ id, label }) => ({ id, label })),
     rows: filtered,
     // Card payments are moving money, not spending or income, so they're left out.
-    totals: {
-      outCents: filtered.filter((r) => r.amountCents > 0 && !r.isTransfer).reduce((a, r) => a + r.amountCents, 0),
-      inCents: filtered.filter((r) => r.amountCents < 0 && !r.isTransfer).reduce((a, r) => a - r.amountCents, 0),
-    },
+    totals: agg
+      ? { outCents: agg.out, inCents: agg.in }
+      : {
+          outCents: filtered.filter((r) => r.amountCents > 0 && !r.isTransfer).reduce((a, r) => a + r.amountCents, 0),
+          inCents: filtered.filter((r) => r.amountCents < 0 && !r.isTransfer).reduce((a, r) => a - r.amountCents, 0),
+        },
+    range,
+    rangeLabel: period.label,
+    byMonth: period.months
+      ? period.months.map((m) => {
+          const key = formatMonth(m);
+          return { key, label: monthLabel(m), cents: monthly.find((r) => r.key === key)?.cents ?? 0 };
+        })
+      : null,
+    monthCount: period.months?.length ?? 1,
     searching,
-    truncated: matched.length > filtered.length,
+    truncated: agg ? agg.count > filtered.length : matched.length > filtered.length,
   };
 }
