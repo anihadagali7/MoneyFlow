@@ -81,7 +81,7 @@ The browser never talks to Plaid except through **Plaid Link**, which is Plaid's
 | ORM | **Drizzle** | SQL-first, first-class RLS/raw SQL support, light on serverless cold starts | Prisma |
 | Auth | **Clerk** | MFA + passkeys + Google OAuth out of the box, bot/brute-force protection, session management done right | Supabase Auth (cheaper, fewer vendors, weaker passkey story); Auth.js (most control, most work) |
 | Bank data | **Plaid Transactions** (+ Recurring Transactions) | Industry standard; credit cards covered | MX, Teller |
-| Background jobs | **Inngest** | Durable steps, retries, per-user concurrency keys, runs inside Next.js | Trigger.dev; QStash + Vercel Cron |
+| Background jobs | **Inngest** (deferred: Phase 1 uses Next.js `after()`; see README) | Durable steps, retries, per-user concurrency keys, runs inside Next.js | Trigger.dev; QStash + Vercel Cron |
 | Key management | **AWS KMS** (one symmetric CMK) | Envelope encryption, audit via CloudTrail, key never leaves HSM | GCP KMS; Vercel env key (weaker, MVP only) |
 | LLM | **Claude Haiku 4.5** (`claude-haiku-4-5`) via `@anthropic-ai/sdk` | Cheap and fast classification with structured JSON output; Batch API (50% off) for backfills | Claude Sonnet 5.5 for the low-confidence review pass |
 | Validation | **Zod** | Shared schemas for forms, API and LLM output | Valibot |

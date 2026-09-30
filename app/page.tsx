@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Show, SignInButton, SignUpButton } from "@clerk/nextjs";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 export default function Home() {
   return (
@@ -20,7 +20,9 @@ export default function Home() {
           </SignUpButton>
         </Show>
         <Show when="signed-in">
-          <Button render={<Link href="/dashboard" />}>Go to dashboard</Button>
+          <Link href="/dashboard" className={buttonVariants()}>
+            Go to dashboard
+          </Link>
         </Show>
       </div>
     </main>

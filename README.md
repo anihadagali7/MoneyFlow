@@ -4,8 +4,13 @@ Private, AI-categorized credit card expense tracking. Connect cards through Plai
 have every transaction categorized automatically, and track spend, income and net
 per month. The full design is in [PLAN.md](PLAN.md).
 
-**Status:** Phase 0 (foundations): auth, database schema with Row-Level Security,
-per-user encryption, and the tenant-isolation test suite.
+**Status:** Phase 1: connect cards with Plaid (Sandbox), transaction sync with
+pending→posted handling, AI categorization with Claude Haiku 4.5, merchant rules,
+a transactions page, and a monthly spend dashboard.
+
+Background work (sync, categorization) runs in Next.js `after()` callbacks triggered
+by webhooks, page views and "Sync now", instead of the job queue in PLAN.md.
+That's enough for a personal app; revisit if syncs start hitting time limits.
 
 ## Stack
 
@@ -40,6 +45,7 @@ Requires Node.js 20.19+ (22 LTS recommended) and a Postgres 15+ database.
 | `npm run db:generate` | Generate a migration after editing `lib/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations to `DATABASE_URL` |
 | `npm run db:studio` | Browse the database |
+| `npm run smoke` | Checks Plaid Sandbox + Anthropic keys against the real APIs (no database) |
 
 ## How data stays private
 

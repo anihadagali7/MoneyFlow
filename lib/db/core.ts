@@ -35,3 +35,19 @@ export async function findItemOwner(db: Db, plaidItemId: string): Promise<string
     return row?.userId ?? null;
   });
 }
+
+/**
+ * Records a webhook delivery for idempotency. Returns false if this exact body was
+ * already seen. webhook_events holds no user data and has no RLS.
+ */
+export async function recordWebhookEvent(
+  db: Db,
+  event: { source: string; bodySha256: Buffer; plaidItemId?: string; webhookType?: string; webhookCode?: string },
+): Promise<boolean> {
+  const inserted = await db
+    .insert(schema.webhookEvents)
+    .values(event)
+    .onConflictDoNothing({ target: schema.webhookEvents.bodySha256 })
+    .returning({ id: schema.webhookEvents.id });
+  return inserted.length > 0;
+}

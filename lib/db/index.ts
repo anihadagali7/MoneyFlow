@@ -1,6 +1,6 @@
 import "server-only";
 import { getDb } from "./client";
-import { findItemOwner as findItemOwnerIn, runAsUser, type Tx } from "./core";
+import { findItemOwner as findItemOwnerIn, recordWebhookEvent as recordWebhookEventIn, runAsUser, type Tx } from "./core";
 
 export type { Tx } from "./core";
 
@@ -10,4 +10,8 @@ export function withUser<T>(userId: string, fn: (tx: Tx) => Promise<T>): Promise
 
 export function findItemOwner(plaidItemId: string): Promise<string | null> {
   return findItemOwnerIn(getDb(), plaidItemId);
+}
+
+export function recordWebhookEvent(event: Parameters<typeof recordWebhookEventIn>[1]): Promise<boolean> {
+  return recordWebhookEventIn(getDb(), event);
 }
