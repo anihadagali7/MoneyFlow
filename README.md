@@ -50,8 +50,10 @@ Requires Node.js 20.19+ (22 LTS recommended) and a Postgres 15+ database.
 
 ## Deploying (Vercel)
 
-- Run migrations against the production database **before** pushing code that needs them:
-  `DATABASE_URL="<direct connection string>" npm run db:migrate`
+- Migrations run automatically at the start of every production build (`vercel-build` →
+  `lib/db/migrate.ts`), using `MIGRATION_DATABASE_URL` (the direct, unpooled Neon URL, set for
+  Production only). Preview builds skip them. A failed migration fails the build, so the previous
+  version stays live. Keep migrations additive, since old code briefly runs on the new schema.
 - `CRON_SECRET` must be set in Vercel for the daily catch-up sync (`vercel.json`); Vercel sends
   it to `/api/cron/sync` automatically.
 - `PLAID_WEBHOOK_URL` must point at the production domain (`/api/webhooks/plaid`).

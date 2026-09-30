@@ -9,5 +9,5 @@ Design and roadmap: PLAN.md. Setup and security model: README.md.
 - Sensitive text (merchant, description, names, notes, labels) goes in `*_ct` columns via `encryptField(dek, value, fieldAad(table, column, userId))`. Money is bigint cents with Plaid's sign (positive = money out).
 - Protected pages, Server Actions and Route Handlers call `requireUser()` themselves; `proxy.ts` doesn't enforce auth.
 - "Today" and month boundaries come from `loadUserContext()` (user's timezone), never `new Date()` on the server (Vercel runs in UTC).
-- Schema changes: `npm run db:generate`, then migrate production before deploying.
+- Schema changes: `npm run db:generate`, then `npm run db:migrate` locally. Production migrates itself during the Vercel build (lib/db/migrate.ts); keep migrations additive/backward compatible.
 - Run `npm test`, `npm run lint` and `npm run typecheck` before finishing a change.
