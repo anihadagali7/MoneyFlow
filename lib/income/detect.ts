@@ -1,6 +1,12 @@
 import { detectPattern, FREQUENCIES, median, type Charge } from "@/lib/subscriptions/detect";
 import type { IncomeFrequency } from "@/lib/reports/income";
 
+/**
+ * Take-home pay moves with raises, overtime, 401(k) and tax changes, so paychecks may sit
+ * further from their typical amount than a subscription price; the schedule is the signal.
+ */
+const PAY_AMOUNT_TOLERANCE = 0.35;
+
 export type DepositPattern = {
   frequency: IncomeFrequency;
   amountCents: number; // latest deposit
@@ -14,7 +20,7 @@ export type DepositPattern = {
  * "every 2 weeks", even though both are about 14 days apart.
  */
 export function detectPaycheck(deposits: Charge[]): DepositPattern | null {
-  const p = detectPattern(deposits);
+  const p = detectPattern(deposits, { amountTolerance: PAY_AMOUNT_TOLERANCE });
   if (!p) return null;
   const map: Partial<Record<string, IncomeFrequency>> = {
     weekly: "weekly",
@@ -61,7 +67,7 @@ export function explainDeposits(deposits: Charge[]): { frequency: IncomeFrequenc
     return { frequency, reason: "Some deposits are off schedule (gaps or extra payments)" };
   const amounts = days.map(([, a]) => a);
   const mid = median(amounts);
-  if (amounts.filter((a) => Math.abs(a - mid) <= mid * f.amountTolerance).length / amounts.length < 0.75) {
+  if (amounts.filter((a) => Math.abs(a - mid) <= mid * PAY_AMOUNT_TOLERANCE).length / amounts.length < 0.75) {
     return { frequency, reason: "Amounts vary too much from one deposit to the next" };
   }
   return { frequency, reason: "Doesn't look like a regular paycheck" };

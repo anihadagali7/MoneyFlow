@@ -181,12 +181,24 @@ describe("checking accounts", () => {
     expect(await early("2026-09-20")).toBe(1);
   });
 
-  it("lists pay the automatic check missed, says why, and adds it on request", async () => {
-    // Two of the four paychecks are much bigger (overtime), so the amounts look irregular.
+  it("detects pay whose take-home changes (raises, overtime) as long as the schedule holds", async () => {
     await runAsUser(db, U, (tx) =>
       tx
         .update(transactions)
-        .set({ amountCents: -4100_00 })
+        .set({ amountCents: -3500_00 }) // +22% on two paychecks
+        .where(inArray(transactions.plaidTransactionId, ["pay-2026-08-14", "pay-2026-08-28"])),
+    );
+    expect(
+      await runAsUser(db, U, async (tx) => syncDetectedIncome(tx, await loadUserCrypto(tx, provider, U), "2026-09-20")),
+    ).toBe(1);
+  });
+
+  it("lists pay the automatic check missed, says why, and adds it on request", async () => {
+    // Two of the four deposits are about three times the others, so the amounts look irregular.
+    await runAsUser(db, U, (tx) =>
+      tx
+        .update(transactions)
+        .set({ amountCents: -9000_00 })
         .where(inArray(transactions.plaidTransactionId, ["pay-2026-08-14", "pay-2026-08-28"])),
     );
     const withCrypto = <T>(
@@ -209,9 +221,9 @@ describe("checking accounts", () => {
     expect(await withCrypto((tx, c) => addPayerAsIncome(tx, c, candidate.key, "2026-09-20"))).toBe(true);
     const [source] = await runAsUser(db, U, (tx) => tx.select().from(incomeSources));
     expect(source).toMatchObject({ origin: "detected", frequency: "biweekly", amountCents: 2861_54, endDate: null });
-    // Reports count what actually arrived, overtime included.
+    // Reports count what actually arrived.
     const income = await runAsUser(db, U, (tx) => loadIncomeByMonth(tx, "2026-08-01", "2026-10-01"));
-    expect(Object.fromEntries(income)).toEqual({ "2026-08": 2 * 4100_00, "2026-09": 2861_54 });
+    expect(Object.fromEntries(income)).toEqual({ "2026-08": 2 * 9000_00, "2026-09": 2861_54 });
     expect(await withCrypto((tx, c) => listPayCandidates(tx, c, "2026-09-20"))).toEqual([]);
   });
 

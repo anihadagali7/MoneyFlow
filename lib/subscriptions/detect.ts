@@ -9,9 +9,25 @@ export type Charge = { date: string; amountCents: number };
 
 export const FREQUENCIES = {
   weekly: { days: 7, min: 5, max: 9, minCount: 6, amountTolerance: 0.1, perMonth: 52 / 12, label: "Weekly" },
-  biweekly: { days: 14, min: 12, max: 17, minCount: 4, amountTolerance: 0.1, perMonth: 26 / 12, label: "Every 2 weeks" },
+  biweekly: {
+    days: 14,
+    min: 12,
+    max: 17,
+    minCount: 4,
+    amountTolerance: 0.1,
+    perMonth: 26 / 12,
+    label: "Every 2 weeks",
+  },
   monthly: { days: 30, min: 26, max: 35, minCount: 3, amountTolerance: 0.25, perMonth: 1, label: "Monthly" },
-  quarterly: { days: 91, min: 83, max: 99, minCount: 3, amountTolerance: 0.25, perMonth: 1 / 3, label: "Every 3 months" },
+  quarterly: {
+    days: 91,
+    min: 83,
+    max: 99,
+    minCount: 3,
+    amountTolerance: 0.25,
+    perMonth: 1 / 3,
+    label: "Every 3 months",
+  },
   annually: { days: 365, min: 350, max: 380, minCount: 2, amountTolerance: 0.25, perMonth: 1 / 12, label: "Yearly" },
 } as const;
 export type Frequency = keyof typeof FREQUENCIES;
@@ -38,11 +54,14 @@ export function median(values: number[]): number {
   return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
 }
 
-export function detectPattern(input: Charge[]): Pattern | null {
+/** `amountTolerance` overrides the per-frequency tolerance (pay varies more than a subscription). */
+export function detectPattern(input: Charge[], opts: { amountTolerance?: number } = {}): Pattern | null {
   // One charge per day (duplicates are usually a split or a pending/posted pair), oldest first.
   const byDay = new Map<string, number>();
   for (const c of input) if (c.amountCents > 0) byDay.set(c.date, Math.max(byDay.get(c.date) ?? 0, c.amountCents));
-  const charges = [...byDay].map(([date, amountCents]) => ({ date, amountCents })).sort((a, b) => a.date.localeCompare(b.date));
+  const charges = [...byDay]
+    .map(([date, amountCents]) => ({ date, amountCents }))
+    .sort((a, b) => a.date.localeCompare(b.date));
   if (charges.length < 2) return null;
 
   const intervals = charges.slice(1).map((c, i) => Math.round((utc(c.date) - utc(charges[i].date)) / DAY));
@@ -59,7 +78,8 @@ export function detectPattern(input: Charge[]): Pattern | null {
     // Most amounts must sit near the typical amount.
     const amounts = charges.map((c) => c.amountCents);
     const typicalAmount = median(amounts);
-    const steady = amounts.filter((a) => Math.abs(a - typicalAmount) <= typicalAmount * f.amountTolerance).length;
+    const tolerance = opts.amountTolerance ?? f.amountTolerance;
+    const steady = amounts.filter((a) => Math.abs(a - typicalAmount) <= typicalAmount * tolerance).length;
     if (steady / amounts.length < 0.75) return null;
 
     const last = charges[charges.length - 1];
@@ -70,7 +90,9 @@ export function detectPattern(input: Charge[]): Pattern | null {
       occurrences: charges.length,
       firstDate: charges[0].date,
       lastDate: last.date,
-      nextDate: step ? iso(utc(last.date) + step * DAY) : addMonths(last.date, frequency === "monthly" ? 1 : frequency === "quarterly" ? 3 : 12),
+      nextDate: step
+        ? iso(utc(last.date) + step * DAY)
+        : addMonths(last.date, frequency === "monthly" ? 1 : frequency === "quarterly" ? 3 : 12),
       lastAmountCents: last.amountCents,
       prevAmountCents: prev.amountCents,
       typicalAmountCents: typicalAmount,
@@ -110,7 +132,9 @@ export function priceIncrease(p: Pick<Pattern, "lastAmountCents" | "prevAmountCe
 export function patternFromCharges(input: Charge[], frequency: Frequency): Pattern | null {
   const byDay = new Map<string, number>();
   for (const c of input) if (c.amountCents > 0) byDay.set(c.date, Math.max(byDay.get(c.date) ?? 0, c.amountCents));
-  const charges = [...byDay].map(([date, amountCents]) => ({ date, amountCents })).sort((a, b) => a.date.localeCompare(b.date));
+  const charges = [...byDay]
+    .map(([date, amountCents]) => ({ date, amountCents }))
+    .sort((a, b) => a.date.localeCompare(b.date));
   if (charges.length === 0) return null;
   const last = charges[charges.length - 1];
   const prev = charges.length > 1 ? charges[charges.length - 2] : null;
