@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRightIcon, CreditCardIcon, DownloadIcon, GlobeIcon } from "lucide-react";
+import { ChevronRightIcon, CreditCardIcon, DownloadIcon, GlobeIcon, MessageSquareIcon } from "lucide-react";
 import { CategoriesManager } from "@/components/categories/categories-manager";
 import { PageHeader } from "@/components/page-header";
 import { DeleteAccountButton } from "@/components/settings/delete-account";
@@ -22,6 +22,7 @@ const ACTION_LABEL: Record<string, string> = {
   "card.restore": "Added a card back",
   "category.delete": "Deleted a category",
   import: "Imported transactions from a file",
+  feedback: "Sent feedback",
   "rule.create": "Created a category rule",
   export: "Downloaded your data",
   "account.delete": "Deleted account",
@@ -40,6 +41,18 @@ export function SettingsView({ data, now }: { data: SettingsData; now: number })
             <div className="flex-1">
               <div className="font-medium">Accounts</div>
               <div className="text-xs text-muted-foreground">Cards and bank accounts, balances, add or remove</div>
+            </div>
+            <ChevronRightIcon className="size-4 text-muted-foreground" />
+          </Card>
+        </Link>
+        <Link href="/feedback">
+          <Card className="flex-row items-center gap-3 p-4">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
+              <MessageSquareIcon className="size-4" />
+            </span>
+            <div className="flex-1">
+              <div className="font-medium">Send feedback</div>
+              <div className="text-xs text-muted-foreground">Report a problem or request a feature</div>
             </div>
             <ChevronRightIcon className="size-4 text-muted-foreground" />
           </Card>

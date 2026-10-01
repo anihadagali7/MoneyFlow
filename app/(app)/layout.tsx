@@ -1,4 +1,5 @@
 import { UserButton } from "@clerk/nextjs";
+import { ErrorCapture } from "@/components/feedback/error-capture";
 import { AppShell } from "@/components/shell/app-shell";
 import { TimezoneSync } from "@/components/shell/timezone-sync";
 import { requireUserId } from "@/lib/auth";
@@ -13,6 +14,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <AppShell user={<UserButton />}>
       <TimezoneSync stored={timezone} />
+      <ErrorCapture />
       {children}
     </AppShell>
   );

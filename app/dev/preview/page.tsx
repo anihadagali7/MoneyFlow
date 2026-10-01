@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/shell/app-shell";
 import { AccountsView } from "@/components/views/accounts-view";
+import { PageHeader } from "@/components/page-header";
+import { FeedbackForm } from "@/components/feedback/feedback-form";
 import { ImportPreviewDemo } from "@/components/dev/import-preview-demo";
 import { BudgetsView } from "@/components/views/budgets-view";
 import { GoalDetailView } from "@/components/views/goal-detail-view";
@@ -95,6 +97,17 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     empty: { href: "/dashboard", node: <DashboardView data={{ ...f.dashboard, items: [] }} today={f.today} /> },
     transactions: { href: "/transactions", node: <TransactionsView data={f.transactions} today={f.today} /> },
     reports: { href: "/reports", node: <ReportsView data={f.reports} /> },
+    feedback: {
+      href: "/feedback",
+      node: (
+        <>
+          <PageHeader title="Feedback" description="Report a problem or tell us what you'd like MoneyFlow to do" />
+          <div className="max-w-2xl">
+            <FeedbackForm initialKind="bug" initialArea="transactions" from="/transactions" digest="3528710917" />
+          </div>
+        </>
+      ),
+    },
     "transactions-category-6m": {
       href: "/transactions",
       node: (

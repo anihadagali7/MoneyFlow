@@ -57,6 +57,13 @@ Requires Node.js 20.19+ (22 LTS recommended) and a Postgres 15+ database.
 - `CRON_SECRET` must be set in Vercel for the daily catch-up sync (`vercel.json`); Vercel sends
   it to `/api/cron/sync` automatically.
 - `PLAID_WEBHOOK_URL` must point at the production domain (`/api/webhooks/plaid`).
+- **Feedback → GitHub issues** (optional): set `GITHUB_FEEDBACK_REPO` (`owner/name`) and
+  `GITHUB_FEEDBACK_TOKEN`. Use a **private** repo, since issues in a public repo are visible to
+  everyone. Create a fine-grained token (GitHub → Settings → Developer settings → Fine-grained
+  tokens) limited to that one repo, with **Issues: Read and write** only. Issues are labelled
+  `feedback`, `bug`/`enhancement`/`question` and `area: …`. Each one names its sender only by a
+  `reporter` ref, the first 10 hex characters of `sha256("moneyflow-feedback:" + Clerk user id)`.
+  Error ids in a report match the `digest` in Vercel's logs.
 
 ## How data stays private
 
@@ -74,6 +81,9 @@ Requires Node.js 20.19+ (22 LTS recommended) and a Postgres 15+ database.
   including their wrapped keys, so any ciphertext left in backups becomes unreadable.
 - **Browser:** a per-request nonce Content-Security-Policy (`proxy.ts`), HSTS, no framing.
   Sensitive actions are rate limited in Postgres (`lib/rate-limit.ts`) and recorded in the audit log.
+- **Feedback:** reports carry no transactions, balances, names or emails. Technical details
+  are opt-in, previewed before sending, and scrubbed of amounts, card masks, long numbers,
+  emails and URL query strings (`lib/feedback`); the server re-scrubs whatever it receives.
 
 ## Project layout
 

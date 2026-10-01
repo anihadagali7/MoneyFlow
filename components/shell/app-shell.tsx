@@ -8,6 +8,7 @@ import {
   ChartColumnIcon,
   CreditCardIcon,
   LayoutDashboardIcon,
+  MessageSquareIcon,
   PiggyBankIcon,
   PlaneIcon,
   RepeatIcon,
@@ -87,7 +88,18 @@ export function AppShell({
             </Link>
           ))}
         </nav>
-        <div className="mt-auto flex items-center justify-between gap-2 border-t px-1 pt-4">
+        <Link
+          href="/feedback"
+          aria-current={isActive("/feedback") ? "page" : undefined}
+          className={cn(
+            "mt-auto mb-2 flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+            isActive("/feedback") && "bg-muted font-medium text-foreground",
+          )}
+        >
+          <MessageSquareIcon className="size-4" />
+          Send feedback
+        </Link>
+        <div className="flex items-center justify-between gap-2 border-t px-1 pt-4">
           {user}
           <div className="flex items-center">
             <SettingsLink active={isActive("/settings")} />
