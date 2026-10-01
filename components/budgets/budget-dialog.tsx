@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { formatCents } from "@/lib/money";
+import { centsToInput, formatCents } from "@/lib/money";
 
 const TOTAL = "__total";
 
@@ -101,7 +101,7 @@ export function BudgetDialog({
                 inputMode="decimal"
                 required
                 placeholder={suggested ? String(suggested) : "0"}
-                defaultValue={editing ? (editing.limitCents / 100).toFixed(0) : suggested ? String(suggested) : undefined}
+                defaultValue={editing ? centsToInput(editing.limitCents) : suggested ? String(suggested) : undefined}
                 className="pl-6"
               />
             </div>
