@@ -1,4 +1,4 @@
-import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import * as schema from "./schema";
 
@@ -69,7 +69,7 @@ export async function listItemsForSweep(db: Db, olderThan: Date): Promise<Array<
       .from(schema.plaidItems)
       .where(
         and(
-          eq(schema.plaidItems.status, "active"),
+          inArray(schema.plaidItems.status, schema.AUTO_SYNC_ITEM_STATUSES),
           or(isNull(schema.plaidItems.lastSyncedAt), lt(schema.plaidItems.lastSyncedAt, olderThan)),
         ),
       )

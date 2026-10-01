@@ -9,6 +9,7 @@ import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { categorizeUncategorized, type CategorizeResult } from "@/lib/categorize/pipeline";
 import { getKeyProvider } from "@/lib/crypto/keyProvider";
 import { withUser } from "@/lib/db";
+import { AUTO_SYNC_ITEM_STATUSES } from "@/lib/db/schema";
 import { fetchSyncPage } from "@/lib/plaid/client";
 import { listSyncableItems, syncItem, type RunAsUser, type SyncItemResult } from "@/lib/plaid/sync";
 import { loadTimezone } from "@/lib/user";
@@ -100,7 +101,8 @@ export function shouldRefresh(
   now = Date.now(),
 ): boolean {
   const stale = items.some(
-    (i) => i.status === "active" && (!i.lastSyncedAt || now - i.lastSyncedAt.getTime() > STALE_MS),
+    (i) =>
+      AUTO_SYNC_ITEM_STATUSES.includes(i.status) && (!i.lastSyncedAt || now - i.lastSyncedAt.getTime() > STALE_MS),
   );
   return stale || uncategorized > 0;
 }

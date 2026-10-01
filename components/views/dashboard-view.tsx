@@ -107,7 +107,7 @@ export function DashboardView({
                 {formatCents(current.spendCents)}
               </span>
               {(() => {
-                const d = computeDelta(current.spendCents, lastMonth.spendCents, false, vs);
+                const d = computeDelta(current.spendCents, data.lastMonthToDateSpendCents, false, "vs this time last month");
                 return d ? <DeltaBadge delta={d} /> : null;
               })()}
             </div>
@@ -159,7 +159,7 @@ export function DashboardView({
         </div>
       </div>
 
-      <div className="mt-4 grid items-start gap-4 lg:grid-cols-5">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-5">
         <div className="flex flex-col gap-4 lg:col-span-2">
           {budgets && <BudgetsSummary budgets={budgets} />}
           {goals && goals.goals.length > 0 && <GoalsSummary data={goals} />}

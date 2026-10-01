@@ -17,7 +17,7 @@ import { loadUserContext } from "@/lib/user";
 
 export type IncomeActionResult = { ok: true } | { ok: false; error: string };
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date");
+const isoDate = z.iso.date({ error: "Use a valid date" });
 const amount = z.coerce
   .number({ error: "Enter an amount" })
   .positive("Amount must be more than $0")

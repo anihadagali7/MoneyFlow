@@ -74,19 +74,19 @@ export function AccountsView({ items, now }: { items: ItemSummary[]; now: number
             return (
               <Card key={item.id} className="gap-4 p-5">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-10 items-center justify-center rounded-lg bg-muted">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
                       <CreditCardIcon className="size-5 text-muted-foreground" />
                     </span>
-                    <div>
-                      <div className="font-medium">{item.institutionName}</div>
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{item.institutionName}</div>
                       <div className="text-xs text-muted-foreground">
                         {item.lastSyncedAt ? `Synced ${relativeTime(item.lastSyncedAt, now)}` : "Importing…"}
                       </div>
                     </div>
                   </div>
                   <span
-                    className={`inline-flex items-center gap-1 text-xs ${status.ok ? "text-positive" : "text-destructive"}`}
+                    className={`inline-flex shrink-0 items-center gap-1 text-xs ${status.ok ? "text-positive" : "text-destructive"}`}
                   >
                     {status.ok ? <CheckCircle2Icon className="size-3.5" /> : <AlertTriangleIcon className="size-3.5" />}
                     {status.label}

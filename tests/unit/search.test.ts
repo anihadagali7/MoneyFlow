@@ -31,7 +31,7 @@ beforeEach(async () => {
 });
 afterEach(() => close());
 
-const load = (filters: Record<string, string>) =>
+const load = (filters: Record<string, string | string[]>) =>
   runAsUser(db, U, async (tx) => loadTransactions(tx, await loadUserCrypto(tx, provider, U), filters, today));
 
 describe("search", () => {
@@ -48,6 +48,13 @@ describe("search", () => {
 
   it("without a search, shows only the selected month", async () => {
     const data = await load({ month: "2026-06" });
+    expect(data.searching).toBe(false);
+    expect(data.rows.map((r) => r.merchant)).toEqual(["Spotify"]);
+  });
+
+  it("ignores hand-edited URL values instead of failing", async () => {
+    const data = await load({ card: "not-a-uuid", month: ["2026-06", "2026-07"], q: [] });
+    expect(data.filters.card).toBeUndefined();
     expect(data.searching).toBe(false);
     expect(data.rows.map((r) => r.merchant)).toEqual(["Spotify"]);
   });

@@ -47,6 +47,20 @@ const ctx = <T>(
 ) => runAsUser(db, U, async (tx) => fn(tx, await loadUserCrypto(tx, provider, U)));
 
 describe("savings goals", () => {
+  it("doesn't count the starting amount as saving pace", async () => {
+    await ctx((tx, c) =>
+      createGoal(
+        tx,
+        c,
+        { name: "Car", targetCents: 5000_00, targetDate: "2027-06-01", accountId: null, startingCents: 4000_00 },
+        today,
+      ),
+    );
+    const { goals } = await ctx((tx, c) => loadGoals(tx, c, today));
+    expect(goals[0].savedCents).toBe(4000_00);
+    expect(goals[0].progress).toMatchObject({ projectedDate: null, status: "behind" });
+  });
+
   it("tracks a manual goal from its starting amount and deposits", async () => {
     const id = await ctx((tx, c) =>
       createGoal(

@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SavingsAccount } from "@/lib/goals";
-import { formatCents } from "@/lib/money";
+import { centsToInput, formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 const MANUAL = "__manual";
@@ -52,7 +52,7 @@ function Money({
         inputMode="decimal"
         required={required}
         placeholder="0"
-        defaultValue={defaultValue !== undefined ? (defaultValue / 100).toFixed(0) : undefined}
+        defaultValue={defaultValue !== undefined ? centsToInput(defaultValue) : undefined}
         className="pl-6"
       />
     </div>

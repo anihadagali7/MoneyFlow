@@ -118,11 +118,22 @@ function sumTotals(rows: MonthRow[]): Totals {
   return { spendCents, incomeCents, netCents: incomeCents - spendCents };
 }
 
-export async function loadReport(tx: Tx, crypto: UserCrypto, range: ReportRange): Promise<ReportData> {
+/**
+ * `today` makes the comparison fair: the current month only has spending up to today, so the
+ * prior period's last month is counted up to the same day of the month.
+ */
+export async function loadReport(tx: Tx, crypto: UserCrypto, range: ReportRange, today?: string): Promise<ReportData> {
   const { from, to, priorFrom } = range;
-  const [spend, income, categoryRows, cardRows, accountRows, merchantRows, largestRows, uncategorized] =
+  const n = range.months.length;
+  const lastPrior = monthRange(shiftMonth(range.months[n - 1], -n));
+  const sameDay = today
+    ? new Date(Date.parse(`${lastPrior.from}T00:00:00Z`) + Number(today.slice(8, 10)) * 86_400_000).toISOString().slice(0, 10)
+    : lastPrior.to;
+  const lastPriorCutoff = sameDay < lastPrior.to ? sameDay : lastPrior.to;
+  const [spend, lastPriorToDate, income, categoryRows, cardRows, accountRows, merchantRows, largestRows, uncategorized] =
     await Promise.all([
       spendByMonth(tx, priorFrom, to),
+      spendByMonth(tx, lastPrior.from, lastPriorCutoff),
       loadIncomeByMonth(tx, priorFrom, to),
       spendByCategory(tx, from, to),
       tx
@@ -169,7 +180,10 @@ export async function loadReport(tx: Tx, crypto: UserCrypto, range: ReportRange)
     return { key, label: monthLabel(m), spendCents, incomeCents, netCents: incomeCents - spendCents };
   };
   const months = range.months.map(toRow);
-  const priorMonths = range.months.map((m) => toRow(shiftMonth(m, -range.months.length)));
+  const priorMonths = range.months.map((m) => toRow(shiftMonth(m, -n)));
+  const last = priorMonths[n - 1];
+  last.spendCents = lastPriorToDate.get(last.key) ?? 0;
+  last.netCents = last.incomeCents - last.spendCents;
 
   // Raw SQL results return bytea as Buffer or Uint8Array depending on the driver.
   const buf = (v: Buffer | Uint8Array | null) => (v ? Buffer.from(v) : null);

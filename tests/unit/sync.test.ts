@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadUserCrypto } from "@/lib/crypto/userCrypto";
-import { runAsUser, type Db } from "@/lib/db/core";
+import { listItemsForSweep, runAsUser, type Db } from "@/lib/db/core";
 import { categories, merchantCategories, plaidItems, tags, transactions, transactionTags } from "@/lib/db/schema";
 import { merchantKey } from "@/lib/merchant";
 import { fetchAllUpdates, syncItem, type FetchSyncPage, type SyncPage } from "@/lib/plaid/sync";
@@ -189,6 +189,16 @@ describe("syncItem", () => {
     expect(result.status).toBe("login_required");
     const [item] = await runAsUser(db, U, (tx) => tx.select().from(plaidItems));
     expect(item).toMatchObject({ status: "login_required", lastErrorCode: "ITEM_LOGIN_REQUIRED", syncCursor: null });
+    expect(await listItemsForSweep(db, new Date())).toEqual([]);
+  });
+
+  it("keeps a transient failure in the daily sweep, and recovers on the next sync", async () => {
+    const result = await sync(fakePlaid([plaidError("INTERNAL_SERVER_ERROR")]).fetchPage);
+    expect(result.status).toBe("error");
+    expect(await listItemsForSweep(db, new Date())).toEqual([{ id: itemId, userId: U }]);
+    await sync(fakePlaid([page({ next_cursor: "c1" })]).fetchPage);
+    const [item] = await runAsUser(db, U, (tx) => tx.select().from(plaidItems));
+    expect(item).toMatchObject({ status: "active", lastErrorCode: null });
   });
 
   it("is idempotent when the same page is applied twice", async () => {

@@ -13,7 +13,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const key: RangeKey = (RANGE_KEYS as readonly string[]).includes(range ?? "") ? (range as RangeKey) : "6m";
   const data = await withUser(userId, async (tx) => {
     const { crypto, today } = await loadUserContext(tx, userId);
-    return loadReport(tx, crypto, resolveRange(key, today.month));
+    return loadReport(tx, crypto, resolveRange(key, today.month), today.iso);
   });
   return <ReportsView data={data} />;
 }

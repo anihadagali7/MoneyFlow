@@ -137,6 +137,8 @@ async function ownedIds(tx: Tx, ids: string[]): Promise<string[]> {
 }
 
 export async function addToTrip(tx: Tx, userId: string, tripId: string, ids: string[]) {
+  const [trip] = await tx.select({ id: tags.id }).from(tags).where(and(eq(tags.id, tripId), eq(tags.kind, TRIP)));
+  if (!trip) return 0;
   const valid = await ownedIds(tx, ids);
   if (valid.length === 0) return 0;
   const inserted = await tx
@@ -177,7 +179,15 @@ export async function createTrip(
 }
 
 export async function removeFromTrip(tx: Tx, tripId: string, transactionId: string) {
-  await tx.delete(transactionTags).where(and(eq(transactionTags.tagId, tripId), eq(transactionTags.transactionId, transactionId)));
+  await tx
+    .delete(transactionTags)
+    .where(
+      and(
+        eq(transactionTags.tagId, tripId),
+        eq(transactionTags.transactionId, transactionId),
+        inArray(transactionTags.tagId, tx.select({ id: tags.id }).from(tags).where(eq(tags.kind, TRIP))),
+      ),
+    );
 }
 
 export async function updateTrip(tx: Tx, crypto: UserCrypto, id: string, v: { name: string; startsOn: string; endsOn: string }) {

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CategoryError, createCategory, deleteCategory, listCustomCategories, updateCategory } from "@/lib/categories";
 import { setTransactionCategory } from "@/lib/categorize/rules";
 import { runAsUser, type Db } from "@/lib/db/core";
-import { budgets, categories, merchantCategories, transactions } from "@/lib/db/schema";
+import { budgets, categories, merchantCategories, recurringStreams, transactions } from "@/lib/db/schema";
 import { spendByMonth } from "@/lib/reports/summary";
 import { syncItem } from "@/lib/plaid/sync";
 import { page, plaidTxn, provider, runner, seedUserWithItem } from "../helpers/fixtures";
@@ -76,12 +76,15 @@ describe("custom categories", () => {
     await run((tx) => tx.insert(budgets).values({ userId: U, categoryId: dog.id, amountCents: 300_00 }));
     const vet1 = await txnId("vet1");
     await run((tx) => setTransactionCategory(tx, U, vet1, dog.id, true));
+    // A subscription detected from those charges points at the category too.
+    await run((tx) => tx.insert(recurringStreams).values({ userId: U, categoryId: dog.id, frequency: "monthly" }));
     const [health] = await run((tx) => tx.select().from(categories).where(eq(categories.slug, "health_medical")));
 
     await run((tx) => deleteCategory(tx, U, dog.id, health.id));
     const rows = await run((tx) => tx.select().from(transactions));
     expect(rows.every((r) => r.categoryId === health.id)).toBe(true);
     expect((await run((tx) => tx.select().from(merchantCategories)))[0].categoryId).toBe(health.id);
+    expect((await run((tx) => tx.select().from(recurringStreams)))[0].categoryId).toBe(health.id);
     expect(await run((tx) => tx.select().from(budgets))).toHaveLength(0);
     expect(await run((tx) => listCustomCategories(tx))).toHaveLength(0);
   });

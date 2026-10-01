@@ -22,7 +22,19 @@ export function TransactionFiltersBar({
 }) {
   const router = useRouter();
   const params = useSearchParams();
-  const [q, setQ] = useState(filters.q ?? "");
+  const urlQ = filters.q ?? "";
+  const [q, setQ] = useState(urlQ);
+  // Follow URL changes we didn't make (back/forward, "clear" links), but not the echo of our
+  // own debounced search, which would drop whatever was typed while it was in flight.
+  const [sent, setSent] = useState(urlQ);
+  const [seen, setSeen] = useState(urlQ);
+  if (urlQ !== seen) {
+    setSeen(urlQ);
+    if (urlQ !== sent) {
+      setSent(urlQ);
+      setQ(urlQ);
+    }
+  }
   const [, startTransition] = useTransition();
 
   function set(key: keyof TransactionFilters, value: string | null) {
@@ -34,8 +46,12 @@ export function TransactionFiltersBar({
 
   // Debounce search so we don't navigate on every keystroke.
   useEffect(() => {
-    if ((filters.q ?? "") === q) return;
-    const t = setTimeout(() => set("q", q.trim() || null), 300);
+    const value = q.trim();
+    if (value === urlQ) return;
+    const t = setTimeout(() => {
+      setSent(value);
+      set("q", value || null);
+    }, 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);

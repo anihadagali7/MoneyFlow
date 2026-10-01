@@ -3,6 +3,11 @@ export function toCents(amount: number): number {
   return Math.round(amount * 100);
 }
 
+/** Cents as an editable amount: "150" for whole dollars, "150.50" otherwise, so saving unchanged doesn't round. */
+export function centsToInput(cents: number): string {
+  return (cents / 100).toFixed(cents % 100 === 0 ? 0 : 2);
+}
+
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 export function formatCents(cents: number, currency = "USD"): string {

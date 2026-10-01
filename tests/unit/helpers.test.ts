@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { merchantKey, normalizeMerchant } from "@/lib/merchant";
-import { formatCents, toCents } from "@/lib/money";
+import { centsToInput, formatCents, toCents } from "@/lib/money";
 import { mapPfcToSlug } from "@/lib/plaid/pfc";
 
 describe("money", () => {
@@ -12,6 +12,11 @@ describe("money", () => {
   it("formats cents", () => {
     expect(formatCents(123456)).toBe("$1,234.56");
     expect(formatCents(-500)).toBe("-$5.00");
+  });
+  it("keeps cents when filling an edit field", () => {
+    expect(centsToInput(150_00)).toBe("150");
+    expect(centsToInput(150_50)).toBe("150.50");
+    expect(centsToInput(5)).toBe("0.05");
   });
 });
 

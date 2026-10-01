@@ -161,6 +161,8 @@ export type DashboardData = {
   monthName: string;
   current: Totals;
   lastMonth: Totals;
+  /** Last month's spending up to the same day of the month, to compare with this month so far. */
+  lastMonthToDateSpendCents: number;
   trend: MonthRow[];
   categories: Array<{ slug: string; name: string; cents: number }>;
   uncategorized: number;
@@ -174,9 +176,13 @@ export async function loadDashboard(tx: Tx, crypto: UserCrypto, today: Today): P
   const trendMonths = Array.from({ length: 6 }, (_, i) => shiftMonth(current, i - 5));
   const trendFrom = monthRange(trendMonths[0]).from;
   const { from, to } = monthRange(current);
+  const prev = monthRange(shiftMonth(current, -1));
+  const sameDayLastMonth = shiftDaysIso(prev.from, Number(today.iso.slice(8, 10)));
+  const prevCutoff = sameDayLastMonth < prev.to ? sameDayLastMonth : prev.to;
 
-  const [spend, income, cats, [uncat], [review], recent, items] = await Promise.all([
+  const [spend, prevToDate, income, cats, [uncat], [review], recent, items] = await Promise.all([
     spendByMonth(tx, trendFrom, to),
+    spendByMonth(tx, prev.from, prevCutoff),
     loadIncomeByMonth(tx, trendFrom, to),
     spendByCategory(tx, from, to),
     tx.select({ n: count() }).from(transactions).where(isNull(transactions.categoryId)),
@@ -203,6 +209,7 @@ export async function loadDashboard(tx: Tx, crypto: UserCrypto, today: Today): P
     monthName: new Date(current.year, current.month - 1).toLocaleString("en-US", { month: "long" }),
     current: toTotals(trend[5]),
     lastMonth: toTotals(trend[4]),
+    lastMonthToDateSpendCents: [...prevToDate.values()].reduce((a, c) => a + c, 0),
     trend,
     categories: cats.slice(0, 6),
     uncategorized: uncat.n,
@@ -285,12 +292,36 @@ export function matchesSearch(r: Pick<TxnRow, "merchant" | "description" | "amou
   return r.merchant.toLowerCase().includes(q) || r.description.toLowerCase().includes(q);
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Filters straight from the URL: anything can be typed there, including repeated keys
+ * (which arrive as arrays) and ids that would make Postgres reject the query.
+ */
+export function cleanTxnFilters(raw: Record<string, string | string[] | undefined>): TransactionFilters {
+  const pick = (key: keyof TransactionFilters) => {
+    const v = raw[key];
+    const s = Array.isArray(v) ? v[0] : v;
+    return typeof s === "string" && s ? s : undefined;
+  };
+  const card = pick("card");
+  return {
+    month: pick("month"),
+    range: pick("range"),
+    category: pick("category"),
+    card: card && UUID.test(card) ? card : undefined,
+    review: pick("review"),
+    q: pick("q"),
+  };
+}
+
 export async function loadTransactions(
   tx: Tx,
   crypto: UserCrypto,
-  filters: TransactionFilters,
+  rawFilters: Record<string, string | string[] | undefined>,
   today: Today,
 ): Promise<TransactionsData> {
+  const filters = cleanTxnFilters(rawFilters);
   const month = parseMonth(filters.month, today.month);
   const range: TxnRange = (TXN_RANGES as readonly string[]).includes(filters.range ?? "")
     ? (filters.range as TxnRange)
@@ -347,7 +378,7 @@ export async function loadTransactions(
 
   // Search runs after decryption; merchant names aren't stored in plaintext.
   const matched = searching ? rows.filter((r) => matchesSearch(r, q)) : rows;
-  const filtered = matched.slice(0, SEARCH_RESULT_LIMIT);
+  const filtered = searching ? matched.slice(0, SEARCH_RESULT_LIMIT) : matched;
 
   return {
     monthKey: formatMonth(month),

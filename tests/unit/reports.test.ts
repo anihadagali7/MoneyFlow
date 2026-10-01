@@ -6,6 +6,7 @@ import { categories, incomeEntries, incomeSources, transactions } from "@/lib/db
 import { syncItem } from "@/lib/plaid/sync";
 import { loadIncome } from "@/lib/reports/incomeData";
 import { loadReport, resolveRange } from "@/lib/reports/summary";
+import { loadDashboard } from "@/lib/views/data";
 import { page, plaidTxn, provider, runner, seedUserWithItem } from "../helpers/fixtures";
 import { createTestDb } from "../helpers/testDb";
 
@@ -85,6 +86,32 @@ describe("loadReport", () => {
     expect(report.cards[0]).toMatchObject({ label: "Sapphire Preferred ••4242", cents: 130_00 });
     // The prior period for Jul–Sep is Apr–Jun; the March purchase falls outside both.
     expect(report.prior.spendCents).toBe(0);
+  });
+
+  it("counts the prior period's last month only up to today's day of the month", async () => {
+    // Sep–Nov vs Jun–Aug: the $50 on Aug 10 counts once the current month reaches the 10th.
+    const prior = (today: string) =>
+      runAsUser(db, U, async (tx) =>
+        loadReport(tx, await loadUserCrypto(tx, provider, U), resolveRange("3m", { year: 2026, month: 11 }), today),
+      ).then((r) => r.prior.spendCents);
+    expect(await prior("2026-11-08")).toBe(0);
+    expect(await prior("2026-11-10")).toBe(50_00);
+    expect(await prior("2026-11-30")).toBe(50_00);
+  });
+});
+
+describe("loadDashboard", () => {
+  const dashboard = (iso: string) =>
+    runAsUser(db, U, async (tx) =>
+      loadDashboard(tx, await loadUserCrypto(tx, provider, U), { iso, month: { year: 2026, month: 9 } }),
+    );
+
+  it("compares this month so far with last month up to the same day", async () => {
+    const early = await dashboard("2026-09-08");
+    expect(early.current.spendCents).toBe(80_00);
+    expect(early.lastMonth.spendCents).toBe(50_00);
+    expect(early.lastMonthToDateSpendCents).toBe(0); // the Aug 10 purchase hadn't happened by Aug 8
+    expect((await dashboard("2026-09-10")).lastMonthToDateSpendCents).toBe(50_00);
   });
 });
 

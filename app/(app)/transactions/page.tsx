@@ -3,12 +3,12 @@ import { TransactionsView } from "@/components/views/transactions-view";
 import { requireUser } from "@/lib/auth";
 import { withUser } from "@/lib/db";
 import { loadUserContext } from "@/lib/user";
-import { loadTransactions, type TransactionFilters } from "@/lib/views/data";
+import { loadTransactions } from "@/lib/views/data";
 
 export const metadata: Metadata = { title: "Transactions" };
 export const maxDuration = 60;
 
-export default async function TransactionsPage({ searchParams }: { searchParams: Promise<TransactionFilters> }) {
+export default async function TransactionsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const userId = await requireUser();
   const filters = await searchParams;
   const { data, today } = await withUser(userId, async (tx) => {
