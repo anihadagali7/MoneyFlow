@@ -39,3 +39,14 @@ export async function getUserKeys(tx: Tx, provider: KeyProvider, userId: string)
 }
 
 export { evictCachedKeys };
+
+/**
+ * Creates the user's row and encryption keys if they don't have them yet (their first visit).
+ * Looks the row up by id, so the answer never depends on row-level security being enforced.
+ */
+export async function ensureUserRow(tx: Tx, provider: KeyProvider, userId: string): Promise<void> {
+  const [existing] = await tx.select({ id: users.id }).from(users).where(eq(users.id, userId));
+  if (existing) return;
+  const keys = await createUserKeyMaterial(provider, userId);
+  await tx.insert(users).values({ id: userId, ...keys }).onConflictDoNothing();
+}

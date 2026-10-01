@@ -1,10 +1,9 @@
 import "server-only";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { users } from "@/lib/db/schema";
 import { withUser } from "@/lib/db";
 import { getKeyProvider } from "@/lib/crypto/keyProvider";
-import { createUserKeyMaterial } from "@/lib/crypto/userKeys";
+import { ensureUserRow } from "@/lib/crypto/userKeys";
 
 /** Returns the signed-in user's id, or redirects to sign-in. */
 export async function requireUserId(): Promise<string> {
@@ -23,12 +22,7 @@ export async function requireUser(): Promise<string> {
   const userId = await requireUserId();
   if (provisioned.has(userId)) return userId;
 
-  await withUser(userId, async (tx) => {
-    const existing = await tx.query.users.findFirst({ columns: { id: true } });
-    if (existing) return;
-    const keys = await createUserKeyMaterial(getKeyProvider(), userId);
-    await tx.insert(users).values({ id: userId, ...keys }).onConflictDoNothing();
-  });
+  await withUser(userId, (tx) => ensureUserRow(tx, getKeyProvider(), userId));
   provisioned.add(userId);
   return userId;
 }
