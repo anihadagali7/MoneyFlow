@@ -6,8 +6,10 @@ import * as schema from "@/lib/db/schema";
 
 /**
  * In-memory Postgres with the real migrations applied. PGlite connects as a superuser,
- * and superusers always bypass RLS, so we switch to an ordinary role that owns the
- * tables, which is the same situation as the app's role on Neon or Heroku.
+ * and superusers always bypass RLS, so we switch to an ordinary role that owns the tables:
+ * the situation the app must be in. (Neon's default `neondb_owner` is NOT like this: it
+ * has BYPASSRLS, which is why production connects as a separate role.) `client.exec("reset
+ * role")` goes back to the superuser to reproduce a role that bypasses RLS.
  */
 export async function createTestDb() {
   const client = new PGlite();

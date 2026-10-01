@@ -11,6 +11,23 @@ export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
  * `set_config(..., true)` is transaction-local, so the setting can't leak to other
  * requests sharing the pooled connection.
  */
+/**
+ * Why this connection's role would skip row-level security, or null if it can't. Superusers
+ * and BYPASSRLS roles ignore every policy, which would let one user's queries see everyone's
+ * rows. Neon's default owner role (`neondb_owner`, via `neon_superuser`) is one of these, so
+ * the app must connect as a separate role (README: "Database roles").
+ */
+export async function rlsBypassReason(db: Db): Promise<string | null> {
+  const result = await db.execute(
+    sql`select current_user as role, rolsuper as super, rolbypassrls as bypass from pg_roles where rolname = current_user`,
+  );
+  const row = (result as unknown as { rows: Array<{ role: string; super: boolean; bypass: boolean }> }).rows[0];
+  if (!row) return null;
+  if (row.super) return `database role "${row.role}" is a superuser`;
+  if (row.bypass) return `database role "${row.role}" has BYPASSRLS`;
+  return null;
+}
+
 export async function runAsUser<T>(db: Db, userId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
   if (!userId) throw new Error("runAsUser: userId is required");
   return db.transaction(async (tx) => {

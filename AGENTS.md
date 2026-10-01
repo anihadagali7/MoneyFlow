@@ -53,6 +53,10 @@ Design and roadmap: PLAN.md. Setup, security model and operations: README.md.
 - Schema changes: edit `lib/db/schema.ts`, run `npm run db:generate` and commit the new file
   in `drizzle/`, then `npm run db:migrate` locally. Production migrates itself during the
   Vercel build (`lib/db/migrate.ts`). Keep migrations additive and backward compatible.
+- `DATABASE_URL` must connect as a role without `BYPASSRLS` or superuser rights (Neon's
+  `neondb_owner` has `BYPASSRLS`; README: "Database roles"). Tests run as an ordinary role,
+  so they won't catch this. Never filter "is this the user's row?" by RLS alone: use an
+  explicit `where` on the user id.
 - Never bypass row-level security, and never read production user data. Production database
   access is limited to read-only schema checks.
 - Never send user financial data anywhere new: logs, analytics, prompts or GitHub issues.

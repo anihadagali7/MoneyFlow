@@ -1,4 +1,4 @@
-import { ping } from "@/lib/db";
+import { ensureRlsEnforced, ping } from "@/lib/db";
 import { checkEnv } from "@/lib/env";
 
 // For uptime monitors: 200 when the app can reach its database, 503 otherwise.
@@ -13,7 +13,11 @@ export async function GET() {
   if (!lastCheck || now - lastCheck.at > CACHE_MS) {
     let ok = checkEnv().ok;
     try {
-      await Promise.race([ping(), new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000))]);
+      await Promise.race([
+        // Reaching the database, as a role that can't bypass row-level security.
+        ping().then(() => ensureRlsEnforced()),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
+      ]);
     } catch (err) {
       ok = false;
       console.error(JSON.stringify({ level: "error", msg: "health check failed", error: (err as Error).message }));
