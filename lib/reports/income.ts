@@ -52,11 +52,13 @@ export function occurrences(source: IncomeSourceInput, from: string, to: string)
 
   // Month-based: walk months from the start month; clamp days to month length.
   const day = anchor.getUTCDate();
+  // Paid on the last day (Jan 31, Apr 30, Feb 28) usually means "the 15th and the last day".
+  const monthEnd = day === daysInMonth(anchor.getUTCFullYear(), anchor.getUTCMonth());
   const s = new Date(start);
   for (let y = s.getUTCFullYear(), m = s.getUTCMonth(); Date.UTC(y, m, 1) < endExclusive; m === 11 ? (y++, (m = 0)) : m++) {
     let days: number[];
     if (source.frequency === "monthly") days = [day];
-    else if (source.frequency === "semimonthly") days = day <= 15 ? [day, day + 15] : [day - 15, day];
+    else if (source.frequency === "semimonthly") days = monthEnd ? [15, 31] : day <= 15 ? [day, day + 15] : [day - 15, day];
     else days = m === anchor.getUTCMonth() ? [day] : []; // annually
     for (const d of days) {
       const date = ymd(y, m, d);

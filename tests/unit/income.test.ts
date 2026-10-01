@@ -38,6 +38,17 @@ describe("occurrences", () => {
     ]);
   });
 
+  it("semimonthly anchored on a month's last day pays the 15th and the last day", () => {
+    for (const anchorDate of ["2026-01-31", "2026-04-30", "2026-02-28"]) {
+      expect(occurrences(src({ frequency: "semimonthly", anchorDate }), "2026-05-01", "2026-07-01")).toEqual([
+        "2026-05-15",
+        "2026-05-31",
+        "2026-06-15",
+        "2026-06-30",
+      ]);
+    }
+  });
+
   it("annually pays once a year on the anchor month", () => {
     const s = src({ frequency: "annually", anchorDate: "2025-03-15" });
     expect(occurrences(s, "2026-01-01", "2027-01-01")).toEqual(["2026-03-15"]);
