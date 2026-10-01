@@ -30,7 +30,7 @@ const FeedbackSchema = z.object({
     .nullish(),
 });
 
-export type FeedbackResult = { ok: true; issue: number } | { ok: false; error: string };
+export type FeedbackResult = { ok: true; issue: number; url: string | null } | { ok: false; error: string };
 
 /**
  * Files feedback as a GitHub issue. The issue identifies the sender only by a short hash of
@@ -48,11 +48,11 @@ export async function submitFeedback(input: z.input<typeof FeedbackSchema>): Pro
     sentAt: new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC",
   });
   try {
-    const number = await createIssue(issue);
+    const { number, url } = await createIssue(issue);
     await withUser(userId, (tx) =>
       tx.insert(auditLog).values({ userId, action: "feedback", meta: { kind: parsed.data.kind, issue: number } }),
     );
-    return { ok: true, issue: number };
+    return { ok: true, issue: number, url };
   } catch (err) {
     if (err instanceof FeedbackNotConfiguredError) return { ok: false, error: err.message };
     console.error("feedback failed", { error: (err as Error).message });

@@ -53,7 +53,7 @@ export function FeedbackForm({
   const [withDetails, setWithDetails] = useState(initialKind === "bug");
   const [details, setDetails] = useState<FeedbackDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState<number | null>(null);
+  const [sent, setSent] = useState<{ issue: number; url: string | null } | null>(null);
   const [pending, start] = useTransition();
 
   // Read from the browser when needed (sending, or opening the preview), never during render.
@@ -72,7 +72,15 @@ export function FeedbackForm({
           <CheckCircle2Icon className="size-8 text-status-good" />
           <div className="text-lg font-semibold">Thanks, that&apos;s sent</div>
           <p className="max-w-sm text-sm text-muted-foreground">
-            It&apos;s filed as #{sent} for the MoneyFlow team.
+            It&apos;s filed as{" "}
+            {sent.url ? (
+              <a href={sent.url} target="_blank" rel="noreferrer" className="underline underline-offset-4">
+                issue #{sent.issue}
+              </a>
+            ) : (
+              `#${sent.issue}`
+            )}{" "}
+            on GitHub, where you can follow it.
             {kind === "bug" ? " If it keeps happening, sending it again with new details helps." : ""}
           </p>
           <Button
@@ -107,7 +115,7 @@ export function FeedbackForm({
             description,
             details: withDetails ? currentDetails() : null,
           });
-          if (result.ok) setSent(result.issue);
+          if (result.ok) setSent({ issue: result.issue, url: result.url });
           else setError(result.error);
         });
       }}
@@ -207,8 +215,9 @@ export function FeedbackForm({
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Sent to the MoneyFlow team as a GitHub issue, without your name or email. Emails and long numbers are
-            removed automatically; leave out anything else you&apos;d rather keep private.
+            Posted as a <strong className="font-medium text-foreground">public</strong> issue on MoneyFlow&apos;s
+            GitHub, without your name or email. Emails and long numbers are removed automatically; leave out anything
+            else you wouldn&apos;t want others to see.
           </p>
           {error && (
             <p className="text-sm text-destructive" role="alert">

@@ -14,6 +14,8 @@ export const LIMITS = {
   "goal.save": { limit: 60, windowSeconds: 60 },
   import: { limit: 20, windowSeconds: 3600 },
   feedback: { limit: 10, windowSeconds: 3600 },
+  // Background refreshes started by page views (sync + AI categorization).
+  refresh: { limit: 6, windowSeconds: 3600 },
 } as const;
 export type RateLimitedAction = keyof typeof LIMITS;
 

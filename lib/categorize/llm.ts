@@ -53,7 +53,8 @@ export function renderUserMessage(items: LlmTransaction[], fewShots: FewShot[]):
   return parts.join("\n\n");
 }
 
-export function createClaudeCategorizer(client = new Anthropic()): Categorizer {
+// Fail a slow call rather than run out the 60s function limit; the next run picks up the rest.
+export function createClaudeCategorizer(client = new Anthropic({ timeout: 40_000, maxRetries: 1 })): Categorizer {
   return async (items, fewShots) => {
     const response = await client.messages.parse({
       model: CATEGORIZATION_MODEL,

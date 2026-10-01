@@ -58,12 +58,35 @@ Requires Node.js 20.19+ (22 LTS recommended) and a Postgres 15+ database.
   it to `/api/cron/sync` automatically.
 - `PLAID_WEBHOOK_URL` must point at the production domain (`/api/webhooks/plaid`).
 - **Feedback → GitHub issues** (optional): set `GITHUB_FEEDBACK_REPO` (`owner/name`) and
-  `GITHUB_FEEDBACK_TOKEN`. Use a **private** repo, since issues in a public repo are visible to
-  everyone. Create a fine-grained token (GitHub → Settings → Developer settings → Fine-grained
-  tokens) limited to that one repo, with **Issues: Read and write** only. Issues are labelled
+  `GITHUB_FEEDBACK_TOKEN`. Feedback goes to this (public) repo, and the form tells users their
+  report will be public. Create a fine-grained token (GitHub → Settings → Developer settings →
+  Fine-grained tokens) limited to that one repo, with **Issues: Read and write** only. Issues are labelled
   `feedback`, `bug`/`enhancement`/`question` and `area: …`. Each one names its sender only by a
   `reporter` ref, the first 10 hex characters of `sha256("moneyflow-feedback:" + Clerk user id)`.
   Error ids in a report match the `digest` in Vercel's logs.
+
+## Operations
+
+- **CI** (`.github/workflows/ci.yml`): lint, typecheck and tests on every push and pull request.
+  No secrets needed. Vercel still deploys from `main` on its own; to make deploys wait for green
+  CI, protect `main` in GitHub (Settings → Rules) and work in pull requests.
+- **Dependencies:** Dependabot opens a weekly PR for minor/patch updates and separate PRs for
+  majors. CI runs on each one.
+- **Health check:** `GET /api/health` returns 200 when the app is configured and can reach the
+  database, 503 otherwise, and nothing else. Point a free uptime monitor at it (e.g. UptimeRobot
+  or Better Stack, every 5 minutes) to get an email when the site is down.
+- **Configuration:** each server instance checks its environment at startup
+  (`instrumentation.ts`, `lib/env.ts`) and logs the *names* of missing settings.
+- **Errors:** every server error is logged as one JSON line with its `digest`, the same id users
+  see on the error screen and in feedback reports. Search Vercel's logs for it.
+- **Rate limits** (`lib/rate-limit.ts`, per user, in Postgres): linking banks, syncing, imports,
+  exports, edits, feedback, and background refreshes started by page views (6 an hour), which
+  is what keeps Plaid and Claude usage bounded. Webhooks are signature-verified and the cron
+  route needs `CRON_SECRET`. Plaid and Claude calls time out (20s / 40s) instead of hanging.
+- **Edge protection:** Vercel's platform DDoS protection is always on. If the app is ever
+  hammered, turn on Attack Challenge Mode in Vercel → Firewall.
+- **Backups:** Neon keeps a restore window (point-in-time restore) on its free plan; check the
+  window in Neon → Settings before relying on it.
 
 ## How data stays private
 

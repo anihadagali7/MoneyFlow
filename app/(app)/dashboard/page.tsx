@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { after } from "next/server";
 import { DashboardView } from "@/components/views/dashboard-view";
+import { allow } from "@/lib/guard";
 import { requireUser } from "@/lib/auth";
 import { activeAlerts, evaluateBudgetAlerts, loadBudgets } from "@/lib/budgets";
 import { withUser } from "@/lib/db";
@@ -35,7 +36,13 @@ export default async function DashboardPage() {
     status: i.status,
     lastSyncedAt: i.lastSyncedAt ? new Date(i.lastSyncedAt) : null,
   }));
-  if (shouldRefresh(items, data.uncategorized)) after(() => refreshUser(userId));
+  // Capped per user, so a stuck state (say, categorization failing) can't turn every page view
+  // into another round of Plaid and Claude calls.
+  if (shouldRefresh(items, data.uncategorized)) {
+    after(async () => {
+      if (await allow(userId, "refresh")) await refreshUser(userId);
+    });
+  }
   // First visit after this feature shipped (or no history yet): detect in the background.
   else if (subscriptions.active.length + subscriptions.stopped.length === 0 && data.items.length > 0) {
     after(() => detectSubscriptions(userId));

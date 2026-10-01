@@ -87,8 +87,15 @@ describe("createIssue", () => {
     const fetchImpl = vi
       .fn()
       .mockResolvedValueOnce(new Response("{}", { status: 422 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ number: 42 }), { status: 201 }));
-    expect(await createIssue(issue, fetchImpl)).toBe(42);
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ number: 42, html_url: "https://github.com/owner/feedback/issues/42" }), {
+          status: 201,
+        }),
+      );
+    expect(await createIssue(issue, fetchImpl)).toEqual({
+      number: 42,
+      url: "https://github.com/owner/feedback/issues/42",
+    });
     expect(fetchImpl.mock.calls[0][0]).toBe("https://api.github.com/repos/owner/feedback/issues");
     expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toEqual(issue);
     expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toEqual({ title: "t", body: "b" });

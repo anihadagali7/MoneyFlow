@@ -15,7 +15,11 @@ export function getPlaid(): PlaidApi {
   client = new PlaidApi(
     new Configuration({
       basePath,
-      baseOptions: { headers: { "PLAID-CLIENT-ID": clientId, "PLAID-SECRET": secret, "Plaid-Version": "2020-09-14" } },
+      baseOptions: {
+        headers: { "PLAID-CLIENT-ID": clientId, "PLAID-SECRET": secret, "Plaid-Version": "2020-09-14" },
+        // A stuck call shouldn't use up a whole function run (maxDuration is 60s).
+        timeout: 20_000,
+      },
     }),
   );
   return client;

@@ -1,4 +1,5 @@
 import "server-only";
+import { sql } from "drizzle-orm";
 import { getDb } from "./client";
 import {
   findItemOwner as findItemOwnerIn,
@@ -29,4 +30,9 @@ export function markWebhookProcessed(id: string): Promise<void> {
 
 export function listItemsForSweep(olderThan: Date) {
   return listItemsForSweepIn(getDb(), olderThan);
+}
+
+/** For the health check: can we reach Postgres at all? Touches no user data. */
+export async function ping(): Promise<void> {
+  await getDb().execute(sql`select 1`);
 }
