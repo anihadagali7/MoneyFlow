@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadUserCrypto } from "@/lib/crypto/userCrypto";
 import { runAsUser, type Db } from "@/lib/db/core";
+import { tags } from "@/lib/db/schema";
 import { syncItem } from "@/lib/plaid/sync";
 import { addToTrip, createTrip, deleteTrip, dismissSuggestion, loadTripDetail, loadTrips, removeFromTrip } from "@/lib/trips";
 import type { Today } from "@/lib/time";
@@ -68,7 +69,13 @@ describe("trips", () => {
     const grocer = detail!.addable.find((r) => r.merchant === "Grocer")!;
     expect(await ctx((tx) => addToTrip(tx, U, id, [grocer.id, "00000000-0000-4000-8000-000000000000"]))).toBe(1);
     expect((await ctx((tx, c) => loadTripDetail(tx, c, id)))!.rows).toHaveLength(4);
+    // Only real trips: not a deleted one, or another kind of tag.
     await ctx((tx) => deleteTrip(tx, id));
+    expect(await ctx((tx) => addToTrip(tx, U, id, [grocer.id]))).toBe(0);
+    const [other] = await ctx((tx, c) =>
+      tx.insert(tags).values({ userId: U, nameCt: c.encrypt("tags", "name_ct", "x"), kind: "trip_dismissed" }).returning(),
+    );
+    expect(await ctx((tx) => addToTrip(tx, U, other.id, [grocer.id]))).toBe(0);
     expect((await ctx((tx, c) => loadTrips(tx, c, today))).trips).toHaveLength(0);
   });
 

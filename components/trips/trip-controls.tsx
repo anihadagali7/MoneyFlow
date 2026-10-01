@@ -149,7 +149,12 @@ export function SuggestionActions({ suggestion }: { suggestion: SuggestedTrip })
         variant="ghost"
         aria-label={`Not a trip: ${suggestion.city}`}
         disabled={pending}
-        onClick={() => startTransition(() => dismissSuggestionAction(suggestion.key, suggestion.startsOn))}
+        onClick={() =>
+          startTransition(async () => {
+            const result = await dismissSuggestionAction(suggestion.key, suggestion.startsOn);
+            if (!result.ok) toast.error(result.error);
+          })
+        }
       >
         <XIcon />
       </Button>
@@ -175,7 +180,8 @@ export function TripMenu({ id, fields }: { id: string; fields: TripFields }) {
             variant="destructive"
             onClick={() =>
               startTransition(async () => {
-                await deleteTripAction(id);
+                const result = await deleteTripAction(id);
+                if (!result.ok) return void toast.error(result.error);
                 toast.success(`Deleted ${fields.name}`, { description: "Its transactions are unchanged." });
                 router.push("/trips");
               })
@@ -211,7 +217,12 @@ export function RemoveFromTrip({ tripId, row }: { tripId: string; row: TxnRow })
       size="icon-sm"
       aria-label={`Remove ${row.merchant} from trip`}
       disabled={pending}
-      onClick={() => startTransition(() => removeFromTripAction(tripId, row.id))}
+      onClick={() =>
+        startTransition(async () => {
+          const result = await removeFromTripAction(tripId, row.id);
+          if (!result.ok) toast.error(result.error);
+        })
+      }
     >
       <XIcon />
     </Button>
@@ -267,7 +278,9 @@ export function AddTransactionsButton({ tripId, candidates }: { tripId: string; 
               disabled={selected.size === 0 || pending}
               onClick={() =>
                 startTransition(async () => {
-                  const n = await addToTripAction(tripId, [...selected]);
+                  const result = await addToTripAction(tripId, [...selected]);
+                  if (!result.ok) return void toast.error(result.error);
+                  const n = result.data;
                   toast.success(`Added ${n} transaction${n === 1 ? "" : "s"}`);
                   setOpen(false);
                 })
