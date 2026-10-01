@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { and, count, eq, isNotNull, ne, sql } from "drizzle-orm";
 import type { Tx } from "@/lib/db/core";
-import { auditLog, budgets, categories, merchantCategories, transactions } from "@/lib/db/schema";
+import { auditLog, budgets, categories, merchantCategories, recurringStreams, transactions } from "@/lib/db/schema";
 
 /**
  * The user's own categories. They live in `categories` with user_id set (RLS keeps them
@@ -61,7 +61,7 @@ export async function updateCategory(tx: Tx, id: string, input: { name: string; 
 }
 
 /**
- * Deletes a custom category, moving its transactions and merchant rules to `replacementId`
+ * Deletes a custom category, moving its transactions, merchant rules and subscriptions to `replacementId`
  * so nothing becomes uncategorized. Budgets for it are removed.
  */
 export async function deleteCategory(tx: Tx, userId: string, id: string, replacementId: string) {
@@ -80,6 +80,7 @@ export async function deleteCategory(tx: Tx, userId: string, id: string, replace
     .where(eq(transactions.categoryId, id));
   // Rules for this category now apply the replacement.
   await tx.update(merchantCategories).set({ categoryId: replacementId }).where(eq(merchantCategories.categoryId, id));
+  await tx.update(recurringStreams).set({ categoryId: replacementId }).where(eq(recurringStreams.categoryId, id));
   await tx.delete(budgets).where(eq(budgets.categoryId, id));
   await tx.delete(categories).where(eq(categories.id, id));
   await tx.insert(auditLog).values({ userId, action: "category.delete", meta: {} });
