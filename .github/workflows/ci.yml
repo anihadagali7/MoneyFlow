@@ -22,6 +22,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # package-lock.json is written by npm 11; npm 10 (bundled with Node 22) reads it differently.
+      - run: npm install -g npm@11
       - run: npm ci
       # Route types (PageProps<"/...">) are generated, not committed.
       - run: npx next typegen
