@@ -17,13 +17,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          # Same Node as Vercel (package.json "engines") and local dev (nvm use).
+          node-version-file: .nvmrc
           cache: npm
-      # package-lock.json is written by npm 11; npm 10 (bundled with Node 22) reads it differently.
-      - run: npm install -g npm@11
       - run: npm ci
       # Route types (PageProps<"/...">) are generated, not committed.
       - run: npx next typegen
