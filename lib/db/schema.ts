@@ -65,6 +65,13 @@ export const plaidItems = pgTable("plaid_items", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Item statuses that background syncs (page views, the daily cron) retry on their own.
+ * Pending expiration still has a working token; "error" is usually transient. The rest need
+ * the user to reconnect first.
+ */
+export const AUTO_SYNC_ITEM_STATUSES = ["active", "pending_expiration", "error"];
+
 export const accounts = pgTable("accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: text("user_id")

@@ -62,6 +62,18 @@ export async function POST(req: Request) {
       if (item) await refreshUser(userId, { itemIds: [item.id] });
       await done();
     });
+  } else if (body.webhook_type === "ITEM" && code === "LOGIN_REPAIRED") {
+    after(async () => {
+      const [item] = await withUser(userId, (tx) =>
+        tx
+          .update(plaidItems)
+          .set({ status: "active", lastErrorCode: null })
+          .where(eq(plaidItems.plaidItemId, plaidItemId))
+          .returning({ id: plaidItems.id }),
+      );
+      if (item) await refreshUser(userId, { itemIds: [item.id] });
+      await done();
+    });
   } else if (body.webhook_type === "ITEM") {
     const errorCode = body.error?.error_code;
     const status =
