@@ -18,15 +18,18 @@ describe("checkEnv", () => {
     expect(checkEnv(base)).toEqual({ ok: true, missing: [], warnings: [] });
   });
 
-  it("names what's missing, including production-only settings and the KMS key", () => {
-    const { ok, missing } = checkEnv({ ...base, DATABASE_URL: "", KEY_PROVIDER: "aws", VERCEL_ENV: "production" });
+  it("names what's missing, including the KMS key when using AWS", () => {
+    const { ok, missing } = checkEnv({ ...base, DATABASE_URL: "", KEY_PROVIDER: "aws" });
     expect(ok).toBe(false);
-    expect(missing).toEqual([
-      "DATABASE_URL",
-      "KMS_KEY_ID",
-      "CRON_SECRET",
-      "PLAID_WEBHOOK_URL",
-      "CLERK_WEBHOOK_SIGNING_SECRET",
+    expect(missing).toEqual(["DATABASE_URL", "KMS_KEY_ID"]);
+  });
+
+  it("warns about production extras without marking the app down", () => {
+    const { ok, warnings } = checkEnv({ ...base, VERCEL_ENV: "production", PLAID_WEBHOOK_URL: "x" });
+    expect(ok).toBe(true);
+    expect(warnings).toEqual([
+      "CRON_SECRET is not set: the daily catch-up sync is refused",
+      "CLERK_WEBHOOK_SIGNING_SECRET is not set: accounts deleted in Clerk's dashboard aren't cleaned up",
     ]);
   });
 

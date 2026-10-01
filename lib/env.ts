@@ -18,8 +18,16 @@ export function checkEnv(env: Record<string, string | undefined> = process.env) 
   else if (provider === "local") need("LOCAL_MASTER_KEY");
   else missing.push(`KEY_PROVIDER (unknown value)`);
 
+  // Production extras: each one only switches off one feature, so they don't mark the app down.
   if (env.VERCEL_ENV === "production") {
-    ["CRON_SECRET", "PLAID_WEBHOOK_URL", "CLERK_WEBHOOK_SIGNING_SECRET"].forEach(need);
+    const feature: Record<string, string> = {
+      CRON_SECRET: "the daily catch-up sync is refused",
+      PLAID_WEBHOOK_URL: "new bank links won't get Plaid webhooks",
+      CLERK_WEBHOOK_SIGNING_SECRET: "accounts deleted in Clerk's dashboard aren't cleaned up",
+    };
+    for (const [name, effect] of Object.entries(feature)) {
+      if (!env[name]) warnings.push(`${name} is not set: ${effect}`);
+    }
   }
   if (!env.ANTHROPIC_API_KEY) warnings.push("ANTHROPIC_API_KEY is not set: AI categorization is off");
   if (!env.GITHUB_FEEDBACK_TOKEN || !env.GITHUB_FEEDBACK_REPO) {
