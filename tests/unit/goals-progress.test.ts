@@ -44,4 +44,12 @@ describe("contributionPace", () => {
     );
     expect(pace).toBe(Math.round((800_00 / 90) * 30.44));
   });
+
+  it("averages a young goal over its age, but at least a month", () => {
+    const deposits = [{ amountCents: 600_00, date: "2026-09-20" }];
+    // Started 60 days ago (inclusive): $600 over 60 days, not 90.
+    expect(contributionPace(deposits, "2026-09-30", { startedOn: "2026-08-02" })).toBe(Math.round((600_00 / 60) * 30.44));
+    expect(contributionPace(deposits, "2026-09-30", { startedOn: "2026-09-25" })).toBe(Math.round((600_00 / 30) * 30.44));
+    expect(contributionPace(deposits, "2026-09-30", { startedOn: "2025-01-01" })).toBe(Math.round((600_00 / 90) * 30.44));
+  });
 });

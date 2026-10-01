@@ -63,7 +63,12 @@ export async function loadGoals(tx: Tx, crypto: UserCrypto, today: Today): Promi
   ]);
   const contributions = goalRows.length
     ? await tx
-        .select({ goalId: goalContributions.goalId, amountCents: goalContributions.amountCents, date: goalContributions.date })
+        .select({
+          goalId: goalContributions.goalId,
+          amountCents: goalContributions.amountCents,
+          date: goalContributions.date,
+          createdAt: goalContributions.createdAt,
+        })
         .from(goalContributions)
         .where(inArray(goalContributions.goalId, goalRows.map((g) => g.id)))
     : [];
@@ -72,8 +77,16 @@ export async function loadGoals(tx: Tx, crypto: UserCrypto, today: Today): Promi
     const account = g.accountId ? accountMap.get(g.accountId) ?? null : null;
     const mine = contributions.filter((c) => c.goalId === g.id);
     const savedCents = account ? account.balanceCents ?? 0 : mine.reduce((a, c) => a + c.amountCents, 0);
+    // The starting amount was saved before the goal existed, so it isn't pace. It's inserted
+    // in the same transaction as the goal, so it shares the goal's created_at (now()).
+    const saving = mine.filter((c) => c.createdAt.getTime() !== g.createdAt.getTime());
+    const startedOn = g.createdAt.toISOString().slice(0, 10);
     // Manual goals have a real pace; for account-linked ones, average net is the reference.
-    const paceCents = account ? avgNetCents : mine.length ? contributionPace(mine, today.iso) : null;
+    const paceCents = account
+      ? avgNetCents
+      : saving.length
+        ? contributionPace(saving, today.iso, { startedOn })
+        : null;
     return {
       id: g.id,
       name: crypto.decrypt("savings_goals", "name_ct", g.nameCt),

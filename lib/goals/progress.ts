@@ -55,9 +55,19 @@ export function computeGoalProgress(input: {
   return { pct, remainingCents, reached, monthsLeft, overdue, neededPerMonthCents, projectedDate, status };
 }
 
-/** Average per month over the last `days` days of contributions. */
-export function contributionPace(contributions: Array<{ amountCents: number; date: string }>, today: string, days = 90): number {
+/**
+ * Average per month over the last `days` days of contributions. A goal younger than that
+ * (`startedOn`) is averaged over its own age, but at least a month, so one early deposit
+ * isn't spread over 90 days it didn't exist for.
+ */
+export function contributionPace(
+  contributions: Array<{ amountCents: number; date: string }>,
+  today: string,
+  { days = 90, startedOn }: { days?: number; startedOn?: string } = {},
+): number {
   const since = iso(utc(today) - days * DAY);
   const total = contributions.filter((c) => c.date > since && c.date <= today).reduce((a, c) => a + c.amountCents, 0);
-  return Math.round((total / days) * AVG_MONTH_DAYS);
+  const age = startedOn ? (utc(today) - utc(startedOn)) / DAY + 1 : days;
+  const window = Math.min(days, Math.max(30, age));
+  return Math.round((total / window) * AVG_MONTH_DAYS);
 }
