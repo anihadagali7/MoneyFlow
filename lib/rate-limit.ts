@@ -14,6 +14,8 @@ export const LIMITS = {
   "goal.save": { limit: 60, windowSeconds: 60 },
   import: { limit: 20, windowSeconds: 3600 },
   feedback: { limit: 10, windowSeconds: 3600 },
+  // Questions to the Ask assistant (each can take several Claude calls).
+  ask: { limit: 40, windowSeconds: 86_400 },
   // Background refreshes started by page views (sync + AI categorization).
   refresh: { limit: 6, windowSeconds: 3600 },
 } as const;
@@ -24,7 +26,12 @@ export type RateLimitedAction = keyof typeof LIMITS;
  * exceeded. Stored in Postgres, so limits hold across serverless instances. `tx` must be
  * scoped to the user (withUser).
  */
-export async function takeRateLimit(tx: Tx, userId: string, action: RateLimitedAction, now = Date.now()): Promise<boolean> {
+export async function takeRateLimit(
+  tx: Tx,
+  userId: string,
+  action: RateLimitedAction,
+  now = Date.now(),
+): Promise<boolean> {
   const { limit, windowSeconds } = LIMITS[action];
   const windowMs = windowSeconds * 1000;
   const windowStart = new Date(Math.floor(now / windowMs) * windowMs);

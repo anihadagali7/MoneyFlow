@@ -13,6 +13,7 @@ import {
   PlaneIcon,
   RepeatIcon,
   SettingsIcon,
+  SparklesIcon,
   TargetIcon,
   WalletIcon,
 } from "lucide-react";
@@ -23,6 +24,8 @@ import { ThemeToggle } from "./theme-toggle";
 
 export const NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon, mobile: true },
+  // On phones, Ask is an icon in the top bar.
+  { href: "/ask", label: "Ask", icon: SparklesIcon, mobile: false },
   { href: "/transactions", label: "Transactions", icon: ArrowLeftRightIcon, mobile: true },
   { href: "/budgets", label: "Budgets", icon: PiggyBankIcon, mobile: true },
   { href: "/goals", label: "Goals", icon: TargetIcon, mobile: false },
@@ -114,6 +117,14 @@ export function AppShell({
             <Logo />
           </Link>
           <div className="flex items-center gap-0.5">
+            <Link
+              href="/ask"
+              aria-label="Ask about your money"
+              aria-current={isActive("/ask") ? "page" : undefined}
+              className={cn(buttonVariants({ variant: "ghost", size: "icon" }), isActive("/ask") && "bg-muted")}
+            >
+              <SparklesIcon />
+            </Link>
             <ThemeToggle />
             <SettingsLink active={isActive("/settings")} />
             <span className="ml-1.5 flex">{user}</span>

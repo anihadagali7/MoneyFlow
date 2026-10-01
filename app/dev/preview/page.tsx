@@ -3,6 +3,7 @@ import { AppShell } from "@/components/shell/app-shell";
 import { AccountsView } from "@/components/views/accounts-view";
 import { PageHeader } from "@/components/page-header";
 import { FeedbackForm } from "@/components/feedback/feedback-form";
+import { AskChat } from "@/components/ask/ask-chat";
 import { ImportPreviewDemo } from "@/components/dev/import-preview-demo";
 import { BudgetsView } from "@/components/views/budgets-view";
 import { GoalDetailView } from "@/components/views/goal-detail-view";
@@ -97,6 +98,28 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     empty: { href: "/dashboard", node: <DashboardView data={{ ...f.dashboard, items: [] }} today={f.today} /> },
     transactions: { href: "/transactions", node: <TransactionsView data={f.transactions} today={f.today} /> },
     reports: { href: "/reports", node: <ReportsView data={f.reports} /> },
+    ask: { href: "/ask", node: <AskChat /> },
+    "ask-chat": {
+      href: "/ask",
+      node: (
+        <AskChat
+          initialMessages={[
+            { role: "user", text: "How much did I spend on dining last month?" },
+            {
+              role: "assistant",
+              text: "You spent $412.80 on dining in August 2026 across 23 transactions (Aug 1 – Aug 31).\n- Sushi Place: $148.20 (6 visits)\n- Taco Stand: $96.40 (8 visits)\n- **Blue Bottle**: $61.75 (9 visits)",
+              steps: ["Spending on dining by merchant, 2026-08-01 to 2026-08-31"],
+            },
+            { role: "user", text: "Write me a poem" },
+            {
+              role: "assistant",
+              text: "I can only help with questions about your MoneyFlow data: your spending, income, budgets, subscriptions, trips, goals and accounts.",
+              steps: [],
+            },
+          ]}
+        />
+      ),
+    },
     feedback: {
       href: "/feedback",
       node: (
@@ -129,7 +152,8 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     income: { href: "/income", node: <IncomeView data={f.income} today={f.today} /> },
     "income-empty": {
       href: "/income",
-      node: <IncomeView
+      node: (
+        <IncomeView
           data={{
             sources: [],
             entries: [],
@@ -156,7 +180,8 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
             ],
           }}
           today={f.today}
-        />,
+        />
+      ),
     },
     accounts: { href: "/accounts", node: <AccountsView items={f.items} now={f.now} /> },
     "import-done": {
