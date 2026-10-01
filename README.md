@@ -88,6 +88,36 @@ Requires Node.js 20.19+ (22 LTS recommended) and a Postgres 15+ database.
 - **Backups:** Neon keeps a restore window (point-in-time restore) on its free plan; check the
   window in Neon → Settings before relying on it.
 
+## Database roles
+
+Isolation between users is enforced by Postgres row-level security, and RLS doesn't apply to
+superusers or roles with `BYPASSRLS`. Neon's default `neondb_owner` has `BYPASSRLS` (through
+`neon_superuser`), so production uses two roles:
+
+| Variable | Role | Used for |
+|---|---|---|
+| `MIGRATION_DATABASE_URL` | `neondb_owner` (direct URL) | Migrations during the Vercel build |
+| `DATABASE_URL` | `moneyflow_app` (pooled URL), **no `BYPASSRLS`** | Everything the app does |
+
+Create the app role once per database (Neon → SQL Editor, as `neondb_owner`):
+
+```sql
+CREATE ROLE moneyflow_app LOGIN PASSWORD '<random password>' NOSUPERUSER NOBYPASSRLS;
+GRANT CONNECT ON DATABASE <database> TO moneyflow_app;
+GRANT USAGE ON SCHEMA public TO moneyflow_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO moneyflow_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO moneyflow_app;
+-- Tables and sequences that future migrations create:
+ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO moneyflow_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO moneyflow_app;
+```
+
+Create the role in SQL, not in Neon's Roles page: roles made there join `neon_superuser` and
+get `BYPASSRLS`. In production the app checks its role before its first query and refuses to
+run if it can bypass RLS (`ensureRlsEnforced` in `lib/db`); `/api/health` reports 503 too.
+
 ## How data stays private
 
 - **Row-Level Security:** every user-owned table has a *forced* RLS policy on
