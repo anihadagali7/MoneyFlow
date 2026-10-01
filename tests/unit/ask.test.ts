@@ -219,6 +219,24 @@ describe("askQuestion", () => {
     expect((second.messages.at(-1)!.content as Anthropic.ToolResultBlockParam[])[0].is_error).toBe(true);
   });
 
+  it("sends earlier turns as answered pairs, dropping a question that failed", async () => {
+    const { client, create } = scriptedClient([
+      { stop_reason: "end_turn", content: [{ type: "text", text: "$40." } as Anthropic.TextBlock] },
+    ]);
+    await askQuestion(deps(client), U, "And groceries?", [
+      { role: "assistant", text: "cut-off answer" },
+      { role: "user", text: "Dining in August?" },
+      { role: "assistant", text: "$52.50." },
+      { role: "user", text: "This failed" },
+    ]);
+    const sent = (create.mock.calls[0] as unknown as [Anthropic.MessageCreateParams])[0].messages;
+    expect(sent.map((m) => [m.role, m.content])).toEqual([
+      ["user", "Dining in August?"],
+      ["assistant", "$52.50."],
+      ["user", "And groceries?"],
+    ]);
+  });
+
   it("stops calling tools after a few rounds and asks for a final answer", async () => {
     const loop = {
       stop_reason: "tool_use" as const,

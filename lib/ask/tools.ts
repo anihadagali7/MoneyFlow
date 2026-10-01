@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, gte, lt, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gt, gte, lt, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import type { UserCrypto } from "@/lib/crypto/userCrypto";
 import type { Tx } from "@/lib/db/core";
@@ -25,7 +25,7 @@ export type ToolContext = { tx: Tx; crypto: UserCrypto; today: Today };
 const MAX_DAYS = 3 * 366;
 const MAX_ROWS = 5000;
 const dollars = (cents: number) => Math.round(cents) / 100;
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const isoDate = z.iso.date({ error: "Use a real date as YYYY-MM-DD" });
 
 /** Inclusive [start, end] dates → [from, to) for queries, kept to at most ~3 years. */
 function period(start: string, end: string) {
@@ -79,20 +79,32 @@ const SpendingSummary = z.object({
 async function spendingSummary(ctx: ToolContext, input: z.infer<typeof SpendingSummary>) {
   const { from, to, label } = period(input.start_date, input.end_date);
   const category = input.category ? await findCategory(ctx.tx, input.category) : null;
-  const rows = await ctx.tx
-    .select({
-      date: transactions.date,
-      amountCents: transactions.amountCents,
-      accountId: transactions.accountId,
-      merchantHash: transactions.merchantHash,
-      merchantNameCt: transactions.merchantNameCt,
-      descriptionCt: transactions.descriptionCt,
-      category: categories.name,
-    })
-    .from(transactions)
-    .innerJoin(categories, eq(categories.id, transactions.categoryId))
-    .where(spendWhere(from, to, category?.id))
-    .limit(MAX_ROWS);
+  // The total is exact; groups are built from the newest MAX_ROWS rows (merchant names need decrypting).
+  const [[totals], rows] = await Promise.all([
+    ctx.tx
+      .select({
+        cents: sql<number>`coalesce(sum(${transactions.amountCents}), 0)`.mapWith(Number),
+        count: count(),
+      })
+      .from(transactions)
+      .innerJoin(categories, eq(categories.id, transactions.categoryId))
+      .where(spendWhere(from, to, category?.id)),
+    ctx.tx
+      .select({
+        date: transactions.date,
+        amountCents: transactions.amountCents,
+        accountId: transactions.accountId,
+        merchantHash: transactions.merchantHash,
+        merchantNameCt: transactions.merchantNameCt,
+        descriptionCt: transactions.descriptionCt,
+        category: categories.name,
+      })
+      .from(transactions)
+      .innerJoin(categories, eq(categories.id, transactions.categoryId))
+      .where(spendWhere(from, to, category?.id))
+      .orderBy(desc(transactions.date))
+      .limit(MAX_ROWS),
+  ]);
 
   const cards = input.group_by === "card" ? await cardLabels(ctx) : null;
   const groups = new Map<string, { name: string; cents: number; count: number }>();
@@ -112,15 +124,20 @@ async function spendingSummary(ctx: ToolContext, input: z.infer<typeof SpendingS
     g.count += 1;
     groups.set(key, g);
   }
-  const total = rows.reduce((a, r) => a + r.amountCents, 0);
   const sorted = [...groups.values()].sort((a, b) =>
     input.group_by === "month" ? a.name.localeCompare(b.name) : b.cents - a.cents,
   );
+  const partial = input.group_by !== "none" && rows.length < totals.count;
   return {
     period: label,
     category: category?.name ?? "all spending categories",
-    total_spent: dollars(total),
-    transactions: rows.length,
+    total_spent: dollars(totals.cents),
+    transactions: totals.count,
+    ...(partial
+      ? {
+          groups_note: `Groups cover only the newest ${rows.length} of ${totals.count} transactions; say so, or use a shorter period for a complete breakdown.`,
+        }
+      : {}),
     ...(input.group_by === "none"
       ? {}
       : {
@@ -194,6 +211,9 @@ async function findTransactions(ctx: ToolContext, input: z.infer<typeof FindTran
 
   return {
     period: label,
+    ...(rows.length === MAX_ROWS
+      ? { note: `Only the newest ${MAX_ROWS} transactions in this period were searched; older matches may be missing.` }
+      : {}),
     matching: matches.length,
     money_out_total: dollars(matches.reduce((a, m) => a + Math.max(0, m.r.amountCents), 0)),
     money_in_total: dollars(matches.reduce((a, m) => a + Math.max(0, -m.r.amountCents), 0)),

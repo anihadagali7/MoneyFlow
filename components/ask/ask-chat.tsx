@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ArrowUpIcon, Loader2Icon, RotateCcwIcon, SparklesIcon } from "lucide-react";
 import { askQuestion } from "@/actions/ask";
+import { answeredTurns } from "@/lib/ask/turns";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -38,14 +39,16 @@ export function AskChat({
     end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, pending]);
 
-  function send(question: string) {
+  function send(question: string, retry = false) {
     const q = question.trim();
     if (q.length < 2 || pending) return;
-    const history = messages
-      .filter((m): m is Exclude<Message, { role: "error" }> => m.role !== "error")
+    const shown = messages.filter((m): m is Exclude<Message, { role: "error" }> => m.role !== "error");
+    // Retrying replaces the question that failed instead of showing it twice.
+    if (retry && shown.at(-1)?.role === "user") shown.pop();
+    const history = answeredTurns(shown)
       .slice(-12)
       .map((m) => ({ role: m.role, text: m.text.slice(0, 4000) }));
-    setMessages((all) => [...all.filter((m) => m.role !== "error"), { role: "user", text: q }]);
+    setMessages([...shown, { role: "user", text: q }]);
     setDraft("");
     start(async () => {
       const result = await askQuestion({ question: q, history }).catch(() => null);
@@ -87,7 +90,7 @@ export function AskChat({
       ) : (
         <div className="flex flex-col gap-3" aria-live="polite">
           {messages.map((m, i) => (
-            <MessageBubble key={i} message={m} onRetry={send} />
+            <MessageBubble key={i} message={m} onRetry={(q) => send(q, true)} />
           ))}
           {pending && (
             <div className="flex items-center gap-2 self-start rounded-2xl bg-muted px-4 py-3 text-sm text-muted-foreground">

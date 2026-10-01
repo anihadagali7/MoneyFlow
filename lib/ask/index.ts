@@ -5,6 +5,7 @@ import type { RunAsUser } from "@/lib/plaid/sync";
 import { todayIn, type Today } from "@/lib/time";
 import { loadTimezone } from "@/lib/user";
 import { runTool, ToolInputError, toolSpecs } from "./tools";
+import { answeredTurns } from "./turns";
 
 export const ASK_MODEL = "claude-haiku-4-5";
 const MAX_ROUNDS = 6;
@@ -59,7 +60,7 @@ export async function askQuestion(
   });
 
   const messages: Anthropic.MessageParam[] = [
-    ...history.map((t) => ({ role: t.role, content: t.text })),
+    ...answeredTurns(history).map((t) => ({ role: t.role, content: t.text })),
     { role: "user", content: question },
   ];
   const tools = toolSpecs();
