@@ -31,6 +31,12 @@ export function CategorySheetTrigger({
   const [open, setOpen] = useState(false);
   const [always, setAlways] = useState(false);
   const [current, setCurrent] = useState(categoryId);
+  // Server refreshes (a merchant rule, background categorization) can relabel this row.
+  const [synced, setSynced] = useState(categoryId);
+  if (synced !== categoryId) {
+    setSynced(categoryId);
+    setCurrent(categoryId);
+  }
   const [pending, startTransition] = useTransition();
   const [creating, setCreating] = useState(false);
   const [marking, setMarking] = useState(false);

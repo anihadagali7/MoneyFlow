@@ -51,7 +51,7 @@ export function TripDetailView({ data, today }: { data: TripDetail; today: strin
         />
       </div>
 
-      <div className="mt-4 grid items-start gap-4 lg:grid-cols-5">
+      <div className="mt-4 grid grid-cols-1 items-start gap-4 lg:grid-cols-5">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>By category</CardTitle>

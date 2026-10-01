@@ -334,6 +334,7 @@ export const fixtures = {
     monthName: "September",
     current: { spendCents: months[5].spendCents, incomeCents: months[5].incomeCents, netCents: months[5].netCents },
     lastMonth: { spendCents: months[4].spendCents, incomeCents: months[4].incomeCents, netCents: months[4].netCents },
+    lastMonthToDateSpendCents: Math.round(months[4].spendCents * 0.6),
     trend: months,
     categories: [
       { slug: "groceries", name: "Groceries", cents: 812_40 },

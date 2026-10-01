@@ -29,6 +29,13 @@ export function CategoryCell({
 }) {
   const [value, setValue] = useState<string | null>(categoryId);
   const [flagged, setFlagged] = useState(needsReview);
+  // Server refreshes (a merchant rule, background categorization) can relabel this row.
+  const [synced, setSynced] = useState({ categoryId, needsReview });
+  if (synced.categoryId !== categoryId || synced.needsReview !== needsReview) {
+    setSynced({ categoryId, needsReview });
+    setValue(categoryId);
+    setFlagged(needsReview);
+  }
   const [pending, startTransition] = useTransition();
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<CategoryOption[]>([]);
@@ -54,12 +61,16 @@ export function CategoryCell({
         action: {
           label: "Always",
           onClick: async () => {
-            const { relabeled } = await setCategory({ transactionId, categoryId: next, applyToMerchant: true });
-            toast.success(`Rule saved for ${merchant}`, {
-              description: relabeled
-                ? `${relabeled} other transaction${relabeled === 1 ? "" : "s"} updated`
-                : undefined,
-            });
+            try {
+              const { relabeled } = await setCategory({ transactionId, categoryId: next, applyToMerchant: true });
+              toast.success(`Rule saved for ${merchant}`, {
+                description: relabeled
+                  ? `${relabeled} other transaction${relabeled === 1 ? "" : "s"} updated`
+                  : undefined,
+              });
+            } catch {
+              toast.error("Couldn't save the rule. Please try again.");
+            }
           },
         },
       });
