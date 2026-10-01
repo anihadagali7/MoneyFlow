@@ -12,7 +12,7 @@ import { loadUserContext } from "@/lib/user";
 
 type Result<T = void> = { ok: true; data: T } | { ok: false; error: string };
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a valid date");
+const isoDate = z.iso.date({ error: "Use a valid date" });
 const money = z.coerce.number({ error: "Enter an amount" }).max(100_000_000, "That amount looks too large");
 const GoalInput = z.object({
   name: z.string().trim().min(1, "Give the goal a name").max(60),
