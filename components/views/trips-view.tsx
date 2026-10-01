@@ -61,7 +61,7 @@ export function TripsView({ data, today }: { data: TripsData; today: string }) {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {data.trips.map((t) => (
             <Link key={t.id} href={`/trips/${t.id}`}>
               <Card className="gap-3 p-5 transition-colors hover:bg-muted/40">

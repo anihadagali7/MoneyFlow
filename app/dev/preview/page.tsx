@@ -98,6 +98,25 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     empty: { href: "/dashboard", node: <DashboardView data={{ ...f.dashboard, items: [] }} today={f.today} /> },
     transactions: { href: "/transactions", node: <TransactionsView data={f.transactions} today={f.today} /> },
     reports: { href: "/reports", node: <ReportsView data={f.reports} /> },
+    "reports-long": {
+      href: "/reports",
+      node: (
+        <ReportsView
+          data={{
+            ...f.reports,
+            categories: [
+              { slug: "rent_long", name: "Rent & Housing (BILT CARD HOUSING PPD ID: 1844372402)", cents: 2790_00, count: 2 },
+              ...f.reports.categories,
+            ],
+            cards: [{ id: "chk", label: "TOTAL CHECKING ••9975 Chase Premier Plus Checking Account", cents: 5120_00 }, ...f.reports.cards],
+            merchants: [
+              { name: "VERIZON PAYMENTREC 2582720860001 WEB ID: 9783397101", cents: 237_98, count: 2 },
+              ...f.reports.merchants,
+            ],
+          }}
+        />
+      ),
+    },
     ask: { href: "/ask", node: <AskChat /> },
     "ask-chat": {
       href: "/ask",

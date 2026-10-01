@@ -40,7 +40,7 @@ export function IncomeView({ data, today }: { data: IncomeData; today: string })
         actions={<AddIncomeButton today={today} />}
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatTile
           label="Expected per month"
           value={formatCents(data.monthlyRecurringCents)}
@@ -60,7 +60,7 @@ export function IncomeView({ data, today }: { data: IncomeData; today: string })
 
       <PayCandidates candidates={data.candidates ?? []} className="mt-4" />
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Recurring</CardTitle>

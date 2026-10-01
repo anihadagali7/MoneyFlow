@@ -99,7 +99,7 @@ export function ReportsView({ data }: { data: ReportData }) {
         </CardContent>
       </Card>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Spending by category</CardTitle>

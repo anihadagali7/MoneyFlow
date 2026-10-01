@@ -35,7 +35,7 @@ export function GoalsView({ data, today }: { data: GoalsData; today: string }) {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {data.goals.map((g) => (
             <Card key={g.id} className="gap-3 p-5">
               <Link href={`/goals/${g.id}`} className="flex items-start justify-between gap-2">

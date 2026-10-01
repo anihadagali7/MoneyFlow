@@ -20,7 +20,7 @@ export function BarList({ items, total, empty = "Nothing here yet." }: { items: 
         const row = (
           <>
             <div className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="truncate">{item.label}</span>
+              <span className="min-w-0 truncate">{item.label}</span>
               <span className="shrink-0">
                 <span className="tabular font-medium">{formatCents(item.cents)}</span>
                 <span className="tabular ml-2 inline-block w-9 text-right text-xs text-muted-foreground">{pct}%</span>

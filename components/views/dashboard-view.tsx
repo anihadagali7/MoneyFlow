@@ -98,7 +98,7 @@ export function DashboardView({
         )}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardDescription>Spent in {data.monthName}</CardDescription>
@@ -117,7 +117,7 @@ export function DashboardView({
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-1">
           <StatTile
             label="Income"
             value={formatCents(current.incomeCents)}

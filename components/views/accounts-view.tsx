@@ -68,7 +68,7 @@ export function AccountsView({ items, now }: { items: ItemSummary[]; now: number
           />
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {items.map((item) => {
             const status = STATUS[item.status] ?? { label: item.status, ok: false };
             return (
